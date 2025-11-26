@@ -4,6 +4,8 @@
  * @description Displays custom mod metadata for hovered champion skins
  * @link https://github.com/Alban1911/ROSE-CustomWheel
  */
+console.log("[Rose-CustomWheel] Plugin loaded");
+
 (function createCustomWheelPanel() {
   const LOG_PREFIX = "[Rose-CustomWheel]";
   const PANEL_ID = "rose-custom-wheel-panel";
@@ -12,6 +14,7 @@
   const HEADER_COUNT_ID = "rose-custom-wheel-count";
   const EVENT_SKIN_STATE = "lu-skin-monitor-state";
   const EVENT_MODS_RESPONSE = "rose-custom-wheel-skin-mods";
+  const EVENT_RESET = "rose-custom-wheel-reset";
   const REQUEST_TYPE = "request-skin-mods";
   const OPEN_FOLDER_TYPE = "open-mods-folder";
   const MAX_EMIT_RETRIES = 60;
@@ -96,6 +99,8 @@
     if (!panel) {
       return;
     }
+
+    lastSkinKey = null;
     panel.classList.add("rcw-hidden");
   }
 
@@ -153,6 +158,7 @@
     }
 
     lastSkinKey = key;
+    console.log(`${LOG_PREFIX} Requesting mods for ${championId}:${skinId}`);
     showLoading();
     emitToBridge({ type: REQUEST_TYPE, championId, skinId });
   }
@@ -174,6 +180,7 @@
       return;
     }
 
+    console.log(`${LOG_PREFIX} Received mods response`, detail);
     const mods = Array.isArray(detail.mods) ? detail.mods : [];
     if (!mods.length) {
       hidePanel();
@@ -181,6 +188,11 @@
     }
 
     renderMods(mods);
+  }
+
+  function resetPanel() {
+    lastSkinKey = null;
+    hidePanel();
   }
 
   function insertStyles() {
@@ -295,6 +307,7 @@
     window.addEventListener(EVENT_MODS_RESPONSE, handleModsResponse, {
       passive: true,
     });
+    window.addEventListener(EVENT_RESET, resetPanel, { passive: true });
   });
 })();
 
