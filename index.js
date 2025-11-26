@@ -11,13 +11,13 @@ console.log("[Rose-CustomWheel] Plugin loaded");
   const PANEL_ID = "rose-custom-wheel-panel";
   const LOADING_TEXT_ID = "rose-custom-wheel-loading";
   const MOD_LIST_ID = "rose-custom-wheel-list";
-  const HEADER_COUNT_ID = "rose-custom-wheel-count";
   const EVENT_SKIN_STATE = "lu-skin-monitor-state";
   const EVENT_MODS_RESPONSE = "rose-custom-wheel-skin-mods";
   const EVENT_RESET = "rose-custom-wheel-reset";
   const REQUEST_TYPE = "request-skin-mods";
   const OPEN_FOLDER_TYPE = "open-mods-folder";
   const MAX_EMIT_RETRIES = 60;
+  const PANEL_OFFSET = 12;
 
   let lastSkinKey = null;
   let panel = null;
@@ -42,6 +42,53 @@ console.log("[Rose-CustomWheel] Plugin loaded");
     } catch {
       return "";
     }
+  }
+
+  function attachPanelToChampionSelect() {
+    if (!panel) {
+      return;
+    }
+
+    const championSelect = document.querySelector(".champion-select");
+    const target = championSelect || document.body;
+    if (panel.parentNode !== target) {
+      target.appendChild(panel);
+    }
+  }
+
+  function positionPanel() {
+    if (!panel) {
+      return;
+    }
+
+    const championSelect = document.querySelector(".champion-select");
+    if (!championSelect) {
+      panel.style.position = "fixed";
+      panel.style.top = "";
+      panel.style.left = "";
+      panel.style.right = "20px";
+      panel.style.bottom = "180px";
+      return;
+    }
+
+    const rect = championSelect.getBoundingClientRect();
+    const offset = PANEL_OFFSET;
+    const width = panel.offsetWidth || 260;
+    const height = panel.offsetHeight || 260;
+
+    const maxLeft = Math.max(offset, window.innerWidth - width - offset);
+    const targetLeft = rect.right + window.scrollX - width - offset;
+    const clampedLeft = Math.max(offset, Math.min(targetLeft, maxLeft));
+
+    const maxTop = Math.max(offset, window.innerHeight - height - offset);
+    const targetTop = rect.top + window.scrollY + offset;
+    const clampedTop = Math.max(offset, Math.min(targetTop, maxTop));
+
+    panel.style.position = "absolute";
+    panel.style.top = `${clampedTop}px`;
+    panel.style.left = `${clampedLeft}px`;
+    panel.style.right = "";
+    panel.style.bottom = "";
   }
 
   function emitToBridge(payload) {
@@ -83,6 +130,7 @@ console.log("[Rose-CustomWheel] Plugin loaded");
     });
 
     document.body.appendChild(panel);
+    attachPanelToChampionSelect();
     return panel;
   }
 
@@ -93,6 +141,8 @@ console.log("[Rose-CustomWheel] Plugin loaded");
     loadingEl.style.display = "block";
     listEl.innerHTML = "";
     panelEl.classList.remove("rcw-hidden");
+    attachPanelToChampionSelect();
+    positionPanel();
   }
 
   function hidePanel() {
@@ -111,35 +161,56 @@ console.log("[Rose-CustomWheel] Plugin loaded");
 
     const listEl = panel.querySelector(`#${MOD_LIST_ID}`);
     const loadingEl = panel.querySelector(`#${LOADING_TEXT_ID}`);
-    const countEl = panel.querySelector(`#${HEADER_COUNT_ID}`);
 
     loadingEl.style.display = "none";
-    listEl.innerHTML = mods
-      .map((mod) => {
-        const name = encodeHtml(mod.modName || "Unnamed mod");
-        const description = encodeHtml(mod.description || "");
-        const path = encodeHtml(mod.relativePath || "");
-        const timestamp = formatTimestamp(mod.updatedAt);
-        const metaParts = [];
-        if (path) {
-          metaParts.push(path);
-        }
-        if (timestamp) {
-          metaParts.push(timestamp);
-        }
-        const meta = metaParts.join(" • ");
+    console.log(`${LOG_PREFIX} Rendering ${mods.length} mod(s)`, mods);
 
-        return `
-          <li class="rcw-mod-entry">
-            <span class="rcw-mod-name">${name}</span>
-            ${description ? `<span class="rcw-mod-description">${description}</span>` : ""}
-            ${meta ? `<span class="rcw-mod-meta">${meta}</span>` : ""}
-          </li>
-        `;
-      })
-      .join("");
+    while (listEl.firstChild) {
+      listEl.removeChild(listEl.firstChild);
+    }
+
+    mods.forEach((mod) => {
+      const name = mod.modName || "Unnamed mod";
+      const description = mod.description || "";
+      const path = mod.relativePath || "";
+      const timestamp = formatTimestamp(mod.updatedAt);
+      const metaParts = [];
+      if (path) {
+        metaParts.push(path);
+      }
+      if (timestamp) {
+        metaParts.push(timestamp);
+      }
+      const meta = metaParts.join(" • ");
+
+      const entry = document.createElement("li");
+      entry.className = "rcw-mod-entry";
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "rcw-mod-name";
+      nameEl.textContent = name;
+      entry.appendChild(nameEl);
+
+      if (description) {
+        const descEl = document.createElement("span");
+        descEl.className = "rcw-mod-description";
+        descEl.textContent = description;
+        entry.appendChild(descEl);
+      }
+
+      if (meta) {
+        const metaEl = document.createElement("span");
+        metaEl.className = "rcw-mod-meta";
+        metaEl.textContent = meta;
+        entry.appendChild(metaEl);
+      }
+
+      listEl.appendChild(entry);
+    });
 
     panel.classList.remove("rcw-hidden");
+    attachPanelToChampionSelect();
+    positionPanel();
   }
 
   function handleSkinState(event) {
@@ -308,6 +379,8 @@ console.log("[Rose-CustomWheel] Plugin loaded");
       passive: true,
     });
     window.addEventListener(EVENT_RESET, resetPanel, { passive: true });
+    window.addEventListener("resize", positionPanel, { passive: true });
+    window.addEventListener("scroll", positionPanel, { passive: true });
   });
 })();
 
