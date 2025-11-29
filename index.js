@@ -25,10 +25,11 @@
   let currentSkinData = null;
   let selectedModId = null; // Track which mod is currently selected
   let selectedModSkinId = null; // Track which skin the selected mod belongs to
-  let activeTab = "skins"; // Current active tab: "skins", "maps", "fonts", "announcers"
+  let activeTab = "skins"; // Current active tab: "skins", "maps", "fonts", "announcers", "others"
   let selectedMapId = null;
   let selectedFontId = null;
   let selectedAnnouncerId = null;
+  let selectedOtherId = null;
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
@@ -653,12 +654,17 @@
     announcersTab.className = "tab-button";
     announcersTab.textContent = "Announcers";
     announcersTab.dataset.tab = "announcers";
+    
+    const othersTab = document.createElement("lol-uikit-flat-button-secondary");
+    othersTab.className = "tab-button";
+    othersTab.textContent = "Others";
+    othersTab.dataset.tab = "others";
 
     // Tab click handlers
     const switchTab = (tabName) => {
       activeTab = tabName;
       // Update tab buttons
-      [modsTab, mapsTab, fontsTab, announcersTab].forEach(tab => {
+      [modsTab, mapsTab, fontsTab, announcersTab, othersTab].forEach(tab => {
         if (tab.dataset.tab === tabName) {
           tab.classList.add("active");
         } else {
@@ -666,7 +672,7 @@
         }
       });
       // Update tab content
-      [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent].forEach(content => {
+      [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent, panel._othersContent].forEach(content => {
         if (content.dataset.tab === tabName) {
           content.classList.add("active");
         } else {
@@ -682,6 +688,8 @@
         requestFonts();
       } else if (tabName === "announcers") {
         requestAnnouncers();
+      } else if (tabName === "others") {
+        requestOthers();
       }
     };
 
@@ -701,11 +709,16 @@
       e.stopPropagation();
       switchTab("announcers");
     });
+    othersTab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      switchTab("others");
+    });
 
     tabContainer.appendChild(modsTab);
     tabContainer.appendChild(mapsTab);
     tabContainer.appendChild(fontsTab);
     tabContainer.appendChild(announcersTab);
+    tabContainer.appendChild(othersTab);
 
     // Scrollable area for mod list
     let scrollable;
@@ -735,6 +748,10 @@
     const announcersContent = document.createElement("div");
     announcersContent.className = "tab-content";
     announcersContent.dataset.tab = "announcers";
+
+    const othersContent = document.createElement("div");
+    othersContent.className = "tab-content";
+    othersContent.dataset.tab = "others";
 
     // Create ul lists for each tab
     const modList = document.createElement("ul");
@@ -773,6 +790,15 @@
     announcersList.style.width = "100%";
     announcersList.style.gap = "4px";
 
+    const othersList = document.createElement("ul");
+    othersList.style.listStyle = "none";
+    othersList.style.margin = "0";
+    othersList.style.padding = "0";
+    othersList.style.display = "flex";
+    othersList.style.flexDirection = "column";
+    othersList.style.width = "100%";
+    othersList.style.gap = "4px";
+
     // Loading elements for each tab
     const modsLoading = document.createElement("div");
     modsLoading.className = "mod-loading";
@@ -794,6 +820,11 @@
     announcersLoading.textContent = "Loading announcers…";
     announcersLoading.style.display = "none";
 
+    const othersLoading = document.createElement("div");
+    othersLoading.className = "mod-loading";
+    othersLoading.textContent = "Loading others…";
+    othersLoading.style.display = "none";
+
     // Assemble mods content
     modsContent.appendChild(modsLoading);
     modsContent.appendChild(modList);
@@ -808,11 +839,15 @@
     announcersContent.appendChild(announcersLoading);
     announcersContent.appendChild(announcersList);
 
+    othersContent.appendChild(othersLoading);
+    othersContent.appendChild(othersList);
+
     scrollable.appendChild(tabContainer);
     scrollable.appendChild(modsContent);
     scrollable.appendChild(mapsContent);
     scrollable.appendChild(fontsContent);
     scrollable.appendChild(announcersContent);
+    scrollable.appendChild(othersContent);
 
     modal.appendChild(scrollable);
     flyoutContent.appendChild(modal);
@@ -824,14 +859,17 @@
     panel._mapsList = mapsList;
     panel._fontsList = fontsList;
     panel._announcersList = announcersList;
+    panel._othersList = othersList;
     panel._modsLoading = modsLoading;
     panel._mapsLoading = mapsLoading;
     panel._fontsLoading = fontsLoading;
     panel._announcersLoading = announcersLoading;
+    panel._othersLoading = othersLoading;
     panel._modsContent = modsContent;
     panel._mapsContent = mapsContent;
     panel._fontsContent = fontsContent;
     panel._announcersContent = announcersContent;
+    panel._othersContent = othersContent;
     panel._loadingEl = modsLoading; // Keep for backward compatibility
 
     // Function to calculate and set panel width to exactly match tab container width
@@ -1270,6 +1308,67 @@
     });
   }
 
+  function updateOthersEntries(othersList) {
+    if (!panel || !panel._othersList || !panel._othersLoading) {
+      return;
+    }
+
+    const othersListEl = panel._othersList;
+    const loadingEl = panel._othersLoading;
+    
+    othersListEl.innerHTML = "";
+    
+    if (!othersList || othersList.length === 0) {
+      loadingEl.textContent = "No others found";
+      loadingEl.style.display = "block";
+      return;
+    }
+
+    loadingEl.style.display = "none";
+
+    othersList.forEach((other) => {
+      const listItem = document.createElement("li");
+      const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
+
+      // Create a row container for name and button
+      const otherNameRow = document.createElement("div");
+      otherNameRow.className = "mod-name-row";
+
+      const otherName = document.createElement("div");
+      otherName.className = "mod-name";
+      otherName.textContent = other.name || "Unnamed other";
+      otherNameRow.appendChild(otherName);
+
+      const selectButton = document.createElement("button");
+      selectButton.className = "mod-select-button";
+      listItem.setAttribute("data-other-id", otherId);
+
+      if (selectedOtherId === otherId) {
+        selectButton.textContent = "Selected";
+        selectButton.classList.add("selected");
+      } else {
+        selectButton.textContent = "Select";
+      }
+
+      selectButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleOtherSelect(otherId, selectButton, other);
+      });
+
+      otherNameRow.appendChild(selectButton);
+      listItem.appendChild(otherNameRow);
+
+      if (other.description) {
+        const otherDesc = document.createElement("div");
+        otherDesc.className = "mod-description";
+        otherDesc.textContent = other.description;
+        listItem.appendChild(otherDesc);
+      }
+
+      othersListEl.appendChild(listItem);
+    });
+  }
+
   function handleMapSelect(mapId, buttonElement, mapData) {
     if (selectedMapId === mapId) {
       selectedMapId = null;
@@ -1336,6 +1435,29 @@
       buttonElement.textContent = "Selected";
       buttonElement.classList.add("selected");
       emit({ type: "select-announcer", announcerId, announcerData });
+    }
+  }
+
+  function handleOtherSelect(otherId, buttonElement, otherData) {
+    if (selectedOtherId === otherId) {
+      selectedOtherId = null;
+      buttonElement.textContent = "Select";
+      buttonElement.classList.remove("selected");
+      emit({ type: "select-other", otherId: null });
+    } else {
+      if (selectedOtherId) {
+        const previousButton = panel?._othersList?.querySelector(
+          `[data-other-id="${selectedOtherId}"] .mod-select-button`
+        );
+        if (previousButton) {
+          previousButton.textContent = "Select";
+          previousButton.classList.remove("selected");
+        }
+      }
+      selectedOtherId = otherId;
+      buttonElement.textContent = "Selected";
+      buttonElement.classList.add("selected");
+      emit({ type: "select-other", otherId, otherData });
     }
   }
 
@@ -1556,6 +1678,7 @@
     requestMaps();
     requestFonts();
     requestAnnouncers();
+    requestOthers();
 
     // Add click outside handler
     const closeHandler = (e) => {
@@ -1607,6 +1730,7 @@
     selectedMapId = null;
     selectedFontId = null;
     selectedAnnouncerId = null;
+    selectedOtherId = null;
   }
 
   function requestModsForCurrentSkin() {
@@ -1665,6 +1789,16 @@
     if (panel && panel._announcersLoading) {
       panel._announcersLoading.textContent = "Loading announcers…";
       panel._announcersLoading.style.display = "block";
+    }
+  }
+
+  // Request others - global (not skin-specific)
+  // Backend should look in: %LOCALAPPDATA%\Rose\mods\others
+  function requestOthers() {
+    emit({ type: "request-others" });
+    if (panel && panel._othersLoading) {
+      panel._othersLoading.textContent = "Loading others…";
+      panel._othersLoading.style.display = "block";
     }
   }
 
@@ -1747,6 +1881,20 @@
     updateAnnouncersEntries(announcersList);
   }
 
+  function handleOthersResponse(event) {
+    if (!isOpen || activeTab !== "others") {
+      return;
+    }
+
+    const detail = event?.detail;
+    if (!detail || detail.type !== "others-response") {
+      return;
+    }
+
+    const othersList = Array.isArray(detail.others) ? detail.others : [];
+    updateOthersEntries(othersList);
+  }
+
   function handleChampionLocked(event) {
     const locked = Boolean(event?.detail?.locked);
     if (locked === championLocked) {
@@ -1760,6 +1908,7 @@
       selectedMapId = null;
       selectedFontId = null;
       selectedAnnouncerId = null;
+      selectedOtherId = null;
     }
     
     championLocked = locked;
@@ -1798,6 +1947,9 @@
       passive: true,
     });
     window.addEventListener("rose-custom-wheel-announcers", handleAnnouncersResponse, {
+      passive: true,
+    });
+    window.addEventListener("rose-custom-wheel-others", handleOthersResponse, {
       passive: true,
     });
     window.addEventListener(EVENT_LOCK_STATE, handleChampionLocked, {
