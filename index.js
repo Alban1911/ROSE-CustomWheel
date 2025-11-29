@@ -1089,7 +1089,7 @@
     // Don't reset selection - restore it if it still exists in the mod list
 
     if (!mods || mods.length === 0) {
-      loadingEl.textContent = "No mods found";
+      loadingEl.textContent = "No skins found";
       loadingEl.style.display = "block";
       return;
     }
@@ -1340,7 +1340,7 @@
     othersListEl.innerHTML = "";
     
     if (!othersList || othersList.length === 0) {
-      loadingEl.textContent = "No others found";
+      loadingEl.textContent = "No other mods found";
       loadingEl.style.display = "block";
       return;
     }
