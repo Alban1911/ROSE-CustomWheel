@@ -26,9 +26,6 @@
   let selectedModId = null; // Track which mod is currently selected
   let selectedModSkinId = null; // Track which skin the selected mod belongs to
   let activeTab = "skins"; // Current active tab: "skins", "maps", "fonts", "announcers"
-  let maps = [];
-  let fonts = [];
-  let announcers = [];
   let selectedMapId = null;
   let selectedFontId = null;
   let selectedAnnouncerId = null;
@@ -681,33 +678,15 @@
           content.classList.remove("active");
         }
       });
-      // Request data for the active tab, or show cached data if available
+      // Request data for the active tab (always request fresh data)
       if (tabName === "skins") {
         requestModsForCurrentSkin();
       } else if (tabName === "maps") {
-        if (maps.length > 0) {
-          // Show cached data immediately
-          updateMapsEntries(maps);
-        } else {
-          // Request if no cached data
-          requestMaps();
-        }
+        requestMaps();
       } else if (tabName === "fonts") {
-        if (fonts.length > 0) {
-          // Show cached data immediately
-          updateFontsEntries(fonts);
-        } else {
-          // Request if no cached data
-          requestFonts();
-        }
+        requestFonts();
       } else if (tabName === "announcers") {
-        if (announcers.length > 0) {
-          // Show cached data immediately
-          updateAnnouncersEntries(announcers);
-        } else {
-          // Request if no cached data
-          requestAnnouncers();
-        }
+        requestAnnouncers();
       }
     };
 
@@ -1499,7 +1478,11 @@
       button.classList.add("pressed");
     }
     
+    // Request data for all tabs when panel opens
     requestModsForCurrentSkin();
+    requestMaps();
+    requestFonts();
+    requestAnnouncers();
 
     // Add click outside handler
     const closeHandler = (e) => {
@@ -1637,7 +1620,7 @@
   }
 
   function handleMapsResponse(event) {
-    if (!isOpen) {
+    if (!isOpen || activeTab !== "maps") {
       return;
     }
 
@@ -1646,15 +1629,12 @@
       return;
     }
 
-    maps = Array.isArray(detail.maps) ? detail.maps : [];
-    // Only update UI if maps tab is active
-    if (activeTab === "maps") {
-      updateMapsEntries(maps);
-    }
+    const mapsList = Array.isArray(detail.maps) ? detail.maps : [];
+    updateMapsEntries(mapsList);
   }
 
   function handleFontsResponse(event) {
-    if (!isOpen) {
+    if (!isOpen || activeTab !== "fonts") {
       return;
     }
 
@@ -1663,15 +1643,12 @@
       return;
     }
 
-    fonts = Array.isArray(detail.fonts) ? detail.fonts : [];
-    // Only update UI if fonts tab is active
-    if (activeTab === "fonts") {
-      updateFontsEntries(fonts);
-    }
+    const fontsList = Array.isArray(detail.fonts) ? detail.fonts : [];
+    updateFontsEntries(fontsList);
   }
 
   function handleAnnouncersResponse(event) {
-    if (!isOpen) {
+    if (!isOpen || activeTab !== "announcers") {
       return;
     }
 
@@ -1680,11 +1657,8 @@
       return;
     }
 
-    announcers = Array.isArray(detail.announcers) ? detail.announcers : [];
-    // Only update UI if announcers tab is active
-    if (activeTab === "announcers") {
-      updateAnnouncersEntries(announcers);
-    }
+    const announcersList = Array.isArray(detail.announcers) ? detail.announcers : [];
+    updateAnnouncersEntries(announcersList);
   }
 
   function handleChampionLocked(event) {
