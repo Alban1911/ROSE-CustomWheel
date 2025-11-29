@@ -25,6 +25,13 @@
   let currentSkinData = null;
   let selectedModId = null; // Track which mod is currently selected
   let selectedModSkinId = null; // Track which skin the selected mod belongs to
+  let activeTab = "skins"; // Current active tab: "skins", "maps", "fonts", "announcers"
+  let maps = [];
+  let fonts = [];
+  let announcers = [];
+  let selectedMapId = null;
+  let selectedFontId = null;
+  let selectedAnnouncerId = null;
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
@@ -471,6 +478,50 @@
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
+    .${PANEL_CLASS} .tab-container {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 8px;
+    }
+
+    .${PANEL_CLASS} .tab-button {
+      flex: 1;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      color: rgba(247, 240, 222, 0.7);
+      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .${PANEL_CLASS} .tab-button:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(200, 155, 60, 0.3);
+      color: rgba(247, 240, 222, 0.9);
+    }
+
+    .${PANEL_CLASS} .tab-button.active {
+      background: rgba(200, 155, 60, 0.2);
+      border-color: rgba(200, 155, 60, 0.5);
+      color: #c89b3c;
+    }
+
+    .${PANEL_CLASS} .tab-content {
+      display: none;
+    }
+
+    .${PANEL_CLASS} .tab-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
   `;
 
   function injectCSS() {
@@ -586,6 +637,72 @@
     const modal = document.createElement("div");
     modal.className = "champ-select-chroma-modal chroma-view ember-view";
 
+    // Tab container
+    const tabContainer = document.createElement("div");
+    tabContainer.className = "tab-container";
+
+    // Create tabs
+    const modsTab = document.createElement("button");
+    modsTab.className = "tab-button active";
+    modsTab.textContent = "Skins";
+    modsTab.dataset.tab = "skins";
+    
+    const mapsTab = document.createElement("button");
+    mapsTab.className = "tab-button";
+    mapsTab.textContent = "Maps";
+    mapsTab.dataset.tab = "maps";
+    
+    const fontsTab = document.createElement("button");
+    fontsTab.className = "tab-button";
+    fontsTab.textContent = "Fonts";
+    fontsTab.dataset.tab = "fonts";
+    
+    const announcersTab = document.createElement("button");
+    announcersTab.className = "tab-button";
+    announcersTab.textContent = "Announcers";
+    announcersTab.dataset.tab = "announcers";
+
+    // Tab click handlers
+    const switchTab = (tabName) => {
+      activeTab = tabName;
+      // Update tab buttons
+      [modsTab, mapsTab, fontsTab, announcersTab].forEach(tab => {
+        if (tab.dataset.tab === tabName) {
+          tab.classList.add("active");
+        } else {
+          tab.classList.remove("active");
+        }
+      });
+      // Update tab content
+      [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent].forEach(content => {
+        if (content.dataset.tab === tabName) {
+          content.classList.add("active");
+        } else {
+          content.classList.remove("active");
+        }
+      });
+      // Request data for the active tab
+      if (tabName === "skins") {
+        requestModsForCurrentSkin();
+      } else if (tabName === "maps") {
+        requestMaps();
+      } else if (tabName === "fonts") {
+        requestFonts();
+      } else if (tabName === "announcers") {
+        requestAnnouncers();
+      }
+    };
+
+    modsTab.addEventListener("click", () => switchTab("skins"));
+    mapsTab.addEventListener("click", () => switchTab("maps"));
+    fontsTab.addEventListener("click", () => switchTab("fonts"));
+    announcersTab.addEventListener("click", () => switchTab("announcers"));
+
+    tabContainer.appendChild(modsTab);
+    tabContainer.appendChild(mapsTab);
+    tabContainer.appendChild(fontsTab);
+    tabContainer.appendChild(announcersTab);
+
     // Scrollable area for mod list
     let scrollable;
     try {
@@ -598,7 +715,24 @@
       scrollable.style.overflowY = "auto";
     }
 
-    // Create ul list for mod entries
+    // Create tab content containers
+    const modsContent = document.createElement("div");
+    modsContent.className = "tab-content active";
+    modsContent.dataset.tab = "skins";
+
+    const mapsContent = document.createElement("div");
+    mapsContent.className = "tab-content";
+    mapsContent.dataset.tab = "maps";
+
+    const fontsContent = document.createElement("div");
+    fontsContent.className = "tab-content";
+    fontsContent.dataset.tab = "fonts";
+
+    const announcersContent = document.createElement("div");
+    announcersContent.className = "tab-content";
+    announcersContent.dataset.tab = "announcers";
+
+    // Create ul lists for each tab
     const modList = document.createElement("ul");
     modList.style.listStyle = "none";
     modList.style.margin = "0";
@@ -608,20 +742,79 @@
     modList.style.width = "100%";
     modList.style.gap = "4px";
 
-    // Injection note
+    const mapsList = document.createElement("ul");
+    mapsList.style.listStyle = "none";
+    mapsList.style.margin = "0";
+    mapsList.style.padding = "0";
+    mapsList.style.display = "flex";
+    mapsList.style.flexDirection = "column";
+    mapsList.style.width = "100%";
+    mapsList.style.gap = "4px";
+
+    const fontsList = document.createElement("ul");
+    fontsList.style.listStyle = "none";
+    fontsList.style.margin = "0";
+    fontsList.style.padding = "0";
+    fontsList.style.display = "flex";
+    fontsList.style.flexDirection = "column";
+    fontsList.style.width = "100%";
+    fontsList.style.gap = "4px";
+
+    const announcersList = document.createElement("ul");
+    announcersList.style.listStyle = "none";
+    announcersList.style.margin = "0";
+    announcersList.style.padding = "0";
+    announcersList.style.display = "flex";
+    announcersList.style.flexDirection = "column";
+    announcersList.style.width = "100%";
+    announcersList.style.gap = "4px";
+
+    // Loading elements for each tab
+    const modsLoading = document.createElement("div");
+    modsLoading.className = "mod-loading";
+    modsLoading.textContent = "Waiting for mods…";
+    modsLoading.style.display = "none";
+
+    const mapsLoading = document.createElement("div");
+    mapsLoading.className = "mod-loading";
+    mapsLoading.textContent = "Loading maps…";
+    mapsLoading.style.display = "none";
+
+    const fontsLoading = document.createElement("div");
+    fontsLoading.className = "mod-loading";
+    fontsLoading.textContent = "Loading fonts…";
+    fontsLoading.style.display = "none";
+
+    const announcersLoading = document.createElement("div");
+    announcersLoading.className = "mod-loading";
+    announcersLoading.textContent = "Loading announcers…";
+    announcersLoading.style.display = "none";
+
+    // Injection note for mods
     const injectionNote = document.createElement("div");
     injectionNote.className = "mod-injection-note";
     injectionNote.textContent = "Selected mods will be injected over the hovered skin";
 
-    // Loading element
-    const loadingEl = document.createElement("div");
-    loadingEl.className = "mod-loading";
-    loadingEl.textContent = "Waiting for mods…";
-    loadingEl.style.display = "none";
+    // Assemble mods content
+    modsContent.appendChild(injectionNote);
+    modsContent.appendChild(modsLoading);
+    modsContent.appendChild(modList);
 
-    scrollable.appendChild(injectionNote);
-    scrollable.appendChild(loadingEl);
-    scrollable.appendChild(modList);
+    // Assemble other tabs content
+    mapsContent.appendChild(mapsLoading);
+    mapsContent.appendChild(mapsList);
+
+    fontsContent.appendChild(fontsLoading);
+    fontsContent.appendChild(fontsList);
+
+    announcersContent.appendChild(announcersLoading);
+    announcersContent.appendChild(announcersList);
+
+    scrollable.appendChild(tabContainer);
+    scrollable.appendChild(modsContent);
+    scrollable.appendChild(mapsContent);
+    scrollable.appendChild(fontsContent);
+    scrollable.appendChild(announcersContent);
 
     modal.appendChild(scrollable);
     flyoutContent.appendChild(modal);
@@ -630,7 +823,18 @@
 
     // Store references
     panel._modList = modList;
-    panel._loadingEl = loadingEl;
+    panel._mapsList = mapsList;
+    panel._fontsList = fontsList;
+    panel._announcersList = announcersList;
+    panel._modsLoading = modsLoading;
+    panel._mapsLoading = mapsLoading;
+    panel._fontsLoading = fontsLoading;
+    panel._announcersLoading = announcersLoading;
+    panel._modsContent = modsContent;
+    panel._mapsContent = mapsContent;
+    panel._fontsContent = fontsContent;
+    panel._announcersContent = announcersContent;
+    panel._loadingEl = modsLoading; // Keep for backward compatibility
 
     return panel;
   }
@@ -811,6 +1015,266 @@
     });
   }
 
+  function updateMapsEntries(mapsList) {
+    if (!panel || !panel._mapsList || !panel._mapsLoading) {
+      return;
+    }
+
+    const mapsListEl = panel._mapsList;
+    const loadingEl = panel._mapsLoading;
+    
+    mapsListEl.innerHTML = "";
+    
+    if (!mapsList || mapsList.length === 0) {
+      loadingEl.textContent = "No maps found";
+      loadingEl.style.display = "block";
+      return;
+    }
+
+    loadingEl.style.display = "none";
+
+    mapsList.forEach((map) => {
+      const listItem = document.createElement("li");
+      const mapId = map.id || map.name || `map-${Date.now()}-${Math.random()}`;
+
+      const mapName = document.createElement("div");
+      mapName.className = "mod-name";
+      mapName.textContent = map.name || "Unnamed map";
+      listItem.appendChild(mapName);
+
+      if (map.description) {
+        const mapDesc = document.createElement("div");
+        mapDesc.className = "mod-description";
+        mapDesc.textContent = map.description;
+        listItem.appendChild(mapDesc);
+      }
+
+      const mapMeta = document.createElement("div");
+      mapMeta.className = "mod-meta";
+      const parts = [];
+      if (map.path) {
+        parts.push(map.path);
+      }
+      mapMeta.textContent = parts.join(" • ");
+      listItem.appendChild(mapMeta);
+
+      const selectButton = document.createElement("button");
+      selectButton.className = "mod-select-button";
+      listItem.setAttribute("data-map-id", mapId);
+
+      if (selectedMapId === mapId) {
+        selectButton.textContent = "Selected";
+        selectButton.classList.add("selected");
+      } else {
+        selectButton.textContent = "Select";
+      }
+
+      selectButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleMapSelect(mapId, selectButton, map);
+      });
+
+      listItem.appendChild(selectButton);
+      mapsListEl.appendChild(listItem);
+    });
+  }
+
+  function updateFontsEntries(fontsList) {
+    if (!panel || !panel._fontsList || !panel._fontsLoading) {
+      return;
+    }
+
+    const fontsListEl = panel._fontsList;
+    const loadingEl = panel._fontsLoading;
+    
+    fontsListEl.innerHTML = "";
+    
+    if (!fontsList || fontsList.length === 0) {
+      loadingEl.textContent = "No fonts found";
+      loadingEl.style.display = "block";
+      return;
+    }
+
+    loadingEl.style.display = "none";
+
+    fontsList.forEach((font) => {
+      const listItem = document.createElement("li");
+      const fontId = font.id || font.name || `font-${Date.now()}-${Math.random()}`;
+
+      const fontName = document.createElement("div");
+      fontName.className = "mod-name";
+      fontName.textContent = font.name || "Unnamed font";
+      listItem.appendChild(fontName);
+
+      if (font.description) {
+        const fontDesc = document.createElement("div");
+        fontDesc.className = "mod-description";
+        fontDesc.textContent = font.description;
+        listItem.appendChild(fontDesc);
+      }
+
+      const fontMeta = document.createElement("div");
+      fontMeta.className = "mod-meta";
+      const parts = [];
+      if (font.path) {
+        parts.push(font.path);
+      }
+      fontMeta.textContent = parts.join(" • ");
+      listItem.appendChild(fontMeta);
+
+      const selectButton = document.createElement("button");
+      selectButton.className = "mod-select-button";
+      listItem.setAttribute("data-font-id", fontId);
+
+      if (selectedFontId === fontId) {
+        selectButton.textContent = "Selected";
+        selectButton.classList.add("selected");
+      } else {
+        selectButton.textContent = "Select";
+      }
+
+      selectButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleFontSelect(fontId, selectButton, font);
+      });
+
+      listItem.appendChild(selectButton);
+      fontsListEl.appendChild(listItem);
+    });
+  }
+
+  function updateAnnouncersEntries(announcersList) {
+    if (!panel || !panel._announcersList || !panel._announcersLoading) {
+      return;
+    }
+
+    const announcersListEl = panel._announcersList;
+    const loadingEl = panel._announcersLoading;
+    
+    announcersListEl.innerHTML = "";
+    
+    if (!announcersList || announcersList.length === 0) {
+      loadingEl.textContent = "No announcers found";
+      loadingEl.style.display = "block";
+      return;
+    }
+
+    loadingEl.style.display = "none";
+
+    announcersList.forEach((announcer) => {
+      const listItem = document.createElement("li");
+      const announcerId = announcer.id || announcer.name || `announcer-${Date.now()}-${Math.random()}`;
+
+      const announcerName = document.createElement("div");
+      announcerName.className = "mod-name";
+      announcerName.textContent = announcer.name || "Unnamed announcer";
+      listItem.appendChild(announcerName);
+
+      if (announcer.description) {
+        const announcerDesc = document.createElement("div");
+        announcerDesc.className = "mod-description";
+        announcerDesc.textContent = announcer.description;
+        listItem.appendChild(announcerDesc);
+      }
+
+      const announcerMeta = document.createElement("div");
+      announcerMeta.className = "mod-meta";
+      const parts = [];
+      if (announcer.path) {
+        parts.push(announcer.path);
+      }
+      announcerMeta.textContent = parts.join(" • ");
+      listItem.appendChild(announcerMeta);
+
+      const selectButton = document.createElement("button");
+      selectButton.className = "mod-select-button";
+      listItem.setAttribute("data-announcer-id", announcerId);
+
+      if (selectedAnnouncerId === announcerId) {
+        selectButton.textContent = "Selected";
+        selectButton.classList.add("selected");
+      } else {
+        selectButton.textContent = "Select";
+      }
+
+      selectButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleAnnouncerSelect(announcerId, selectButton, announcer);
+      });
+
+      listItem.appendChild(selectButton);
+      announcersListEl.appendChild(listItem);
+    });
+  }
+
+  function handleMapSelect(mapId, buttonElement, mapData) {
+    if (selectedMapId === mapId) {
+      selectedMapId = null;
+      buttonElement.textContent = "Select";
+      buttonElement.classList.remove("selected");
+      emit({ type: "select-map", mapId: null });
+    } else {
+      if (selectedMapId) {
+        const previousButton = panel?._mapsList?.querySelector(
+          `[data-map-id="${selectedMapId}"] .mod-select-button`
+        );
+        if (previousButton) {
+          previousButton.textContent = "Select";
+          previousButton.classList.remove("selected");
+        }
+      }
+      selectedMapId = mapId;
+      buttonElement.textContent = "Selected";
+      buttonElement.classList.add("selected");
+      emit({ type: "select-map", mapId, mapData });
+    }
+  }
+
+  function handleFontSelect(fontId, buttonElement, fontData) {
+    if (selectedFontId === fontId) {
+      selectedFontId = null;
+      buttonElement.textContent = "Select";
+      buttonElement.classList.remove("selected");
+      emit({ type: "select-font", fontId: null });
+    } else {
+      if (selectedFontId) {
+        const previousButton = panel?._fontsList?.querySelector(
+          `[data-font-id="${selectedFontId}"] .mod-select-button`
+        );
+        if (previousButton) {
+          previousButton.textContent = "Select";
+          previousButton.classList.remove("selected");
+        }
+      }
+      selectedFontId = fontId;
+      buttonElement.textContent = "Selected";
+      buttonElement.classList.add("selected");
+      emit({ type: "select-font", fontId, fontData });
+    }
+  }
+
+  function handleAnnouncerSelect(announcerId, buttonElement, announcerData) {
+    if (selectedAnnouncerId === announcerId) {
+      selectedAnnouncerId = null;
+      buttonElement.textContent = "Select";
+      buttonElement.classList.remove("selected");
+      emit({ type: "select-announcer", announcerId: null });
+    } else {
+      if (selectedAnnouncerId) {
+        const previousButton = panel?._announcersList?.querySelector(
+          `[data-announcer-id="${selectedAnnouncerId}"] .mod-select-button`
+        );
+        if (previousButton) {
+          previousButton.textContent = "Select";
+          previousButton.classList.remove("selected");
+        }
+      }
+      selectedAnnouncerId = announcerId;
+      buttonElement.textContent = "Selected";
+      buttonElement.classList.add("selected");
+      emit({ type: "select-announcer", announcerId, announcerData });
+    }
+  }
 
   function findButtonContainer() {
     // Find the same container that RandomSkin uses
@@ -845,7 +1309,7 @@
         // Same Y level as random button (78px below skin item)
         return {
           x: rect.left + rect.width / 2 + 19 + 8, // Half width + random button width + spacing
-          y: rect.top + 78, // Same Y as random button
+          y: rect.top + 28, // Moved up to be above VIEW ABILITIES bar
           width: 25,
           height: 25,
           relativeTo: item
@@ -858,7 +1322,7 @@
       const rect = selectedItem.getBoundingClientRect();
       return {
         x: rect.left + rect.width / 2 + 19 + 8,
-        y: rect.top + 78, // Same Y as random button
+        y: rect.top + 28, // Moved up to be above VIEW ABILITIES bar
         width: 25,
         height: 25,
         relativeTo: selectedItem
@@ -1068,18 +1532,48 @@
     // If same skin, keep the selection
 
     if (!championId || !skinId) {
-      if (panel && panel._loadingEl) {
-        panel._loadingEl.textContent = "Hover a skin...";
-        panel._loadingEl.style.display = "block";
+      if (panel && panel._modsLoading) {
+        panel._modsLoading.textContent = "Hover a skin...";
+        panel._modsLoading.style.display = "block";
       }
       return;
     }
 
     emit({ type: REQUEST_TYPE, championId, skinId });
 
-    if (panel && panel._loadingEl) {
-      panel._loadingEl.textContent = "Checking for mods…";
-      panel._loadingEl.style.display = "block";
+    if (panel && panel._modsLoading) {
+      panel._modsLoading.textContent = "Checking for mods…";
+      panel._modsLoading.style.display = "block";
+    }
+  }
+
+  // Request maps - global (not skin-specific)
+  // Backend should look in: %LOCALAPPDATA%\Rose\mods\maps
+  function requestMaps() {
+    emit({ type: "request-maps" });
+    if (panel && panel._mapsLoading) {
+      panel._mapsLoading.textContent = "Loading maps…";
+      panel._mapsLoading.style.display = "block";
+    }
+  }
+
+  // Request fonts - global (not skin-specific)
+  // Backend should look in: %LOCALAPPDATA%\Rose\mods\fonts
+  function requestFonts() {
+    emit({ type: "request-fonts" });
+    if (panel && panel._fontsLoading) {
+      panel._fontsLoading.textContent = "Loading fonts…";
+      panel._fontsLoading.style.display = "block";
+    }
+  }
+
+  // Request announcers - global (not skin-specific)
+  // Backend should look in: %LOCALAPPDATA%\Rose\mods\announcers
+  function requestAnnouncers() {
+    emit({ type: "request-announcers" });
+    if (panel && panel._announcersLoading) {
+      panel._announcersLoading.textContent = "Loading announcers…";
+      panel._announcersLoading.style.display = "block";
     }
   }
 
@@ -1120,6 +1614,48 @@
     updateModEntries(mods);
   }
 
+  function handleMapsResponse(event) {
+    if (!isOpen || activeTab !== "maps") {
+      return;
+    }
+
+    const detail = event?.detail;
+    if (!detail || detail.type !== "maps-response") {
+      return;
+    }
+
+    maps = Array.isArray(detail.maps) ? detail.maps : [];
+    updateMapsEntries(maps);
+  }
+
+  function handleFontsResponse(event) {
+    if (!isOpen || activeTab !== "fonts") {
+      return;
+    }
+
+    const detail = event?.detail;
+    if (!detail || detail.type !== "fonts-response") {
+      return;
+    }
+
+    fonts = Array.isArray(detail.fonts) ? detail.fonts : [];
+    updateFontsEntries(fonts);
+  }
+
+  function handleAnnouncersResponse(event) {
+    if (!isOpen || activeTab !== "announcers") {
+      return;
+    }
+
+    const detail = event?.detail;
+    if (!detail || detail.type !== "announcers-response") {
+      return;
+    }
+
+    announcers = Array.isArray(detail.announcers) ? detail.announcers : [];
+    updateAnnouncersEntries(announcers);
+  }
+
   function handleChampionLocked(event) {
     const locked = Boolean(event?.detail?.locked);
     if (locked === championLocked) {
@@ -1152,6 +1688,15 @@
       passive: true,
     });
     window.addEventListener(EVENT_MODS_RESPONSE, handleModsResponse, {
+      passive: true,
+    });
+    window.addEventListener("rose-custom-wheel-maps", handleMapsResponse, {
+      passive: true,
+    });
+    window.addEventListener("rose-custom-wheel-fonts", handleFontsResponse, {
+      passive: true,
+    });
+    window.addEventListener("rose-custom-wheel-announcers", handleAnnouncersResponse, {
       passive: true,
     });
     window.addEventListener(EVENT_LOCK_STATE, handleChampionLocked, {
