@@ -325,8 +325,9 @@
     }
     
     .${PANEL_CLASS} .chroma-modal.chroma-view {
+      height: 400px;
       max-height: 400px;
-      min-height: 200px;
+      min-height: 400px;
     }
     
     .${PANEL_CLASS} .flyout {
@@ -375,6 +376,7 @@
       width: auto;
       position: relative;
       z-index: 1;
+      max-height: 350px;
       min-height: 150px;
     }
 
