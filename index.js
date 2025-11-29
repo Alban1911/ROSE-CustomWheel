@@ -861,6 +861,14 @@
         modal.style.maxWidth = "";
         modal.style.minWidth = "";
         tabContainerEl.style.width = "fit-content";
+        
+        // Reposition panel after width is set to ensure it's centered above the button
+        if (button && isOpen) {
+          // Use requestAnimationFrame to ensure width is applied before repositioning
+          requestAnimationFrame(() => {
+            positionPanel(panel, button);
+          });
+        }
       } else {
         modal.style.width = originalModalWidth;
         tabContainerEl.style.width = originalContainerWidth;
@@ -892,8 +900,20 @@
     let flyoutRect = flyoutFrame.getBoundingClientRect();
 
     if (flyoutRect.width === 0) {
-      // Use actual button width + padding as fallback
-      flyoutRect = { width: rect.width + 32, height: 300 };
+      // Try to get width from the modal element
+      const modal = flyoutFrame.querySelector(".chroma-modal");
+      if (modal) {
+        const modalRect = modal.getBoundingClientRect();
+        if (modalRect.width > 0) {
+          flyoutRect = { width: modalRect.width, height: flyoutRect.height || 300 };
+        } else {
+          // Fallback: use button width + estimated padding
+          flyoutRect = { width: rect.width + 32, height: 300 };
+        }
+      } else {
+        // Fallback: use button width + estimated padding
+        flyoutRect = { width: rect.width + 32, height: 300 };
+      }
     }
 
     const buttonCenterX = rect.left + rect.width / 2;
@@ -1489,18 +1509,25 @@
     panel.style.display = "block";
     panel.style.pointerEvents = "none"; // Will be set to "all" by flyout frame
 
+    // Calculate width first, then position
+    if (panel._calculateWidth) {
+      panel._calculateWidth();
+    }
+    
+    // Initial positioning (will be repositioned after width is calculated)
     positionPanel(panel, button);
 
     // Force a reflow
     panel.offsetHeight;
 
-    // Reposition after render
+    // Reposition after render and width calculation
     setTimeout(() => {
-      positionPanel(panel, button);
-      // Recalculate width when panel opens to ensure tabs are fully rendered
+      // Recalculate width to ensure tabs are fully rendered
       if (panel._calculateWidth) {
         panel._calculateWidth();
       }
+      // Position after width is set
+      positionPanel(panel, button);
     }, 0);
 
     isOpen = true;
