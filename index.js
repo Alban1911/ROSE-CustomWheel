@@ -24,6 +24,7 @@
   let championLocked = false;
   let currentSkinData = null;
   let selectedModId = null; // Track which mod is currently selected
+  let selectedModSkinId = null; // Track which skin the selected mod belongs to
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
@@ -111,8 +112,25 @@
     bridgeSocket.addEventListener("message", (event) => {
       try {
         const payload = JSON.parse(event.data);
-        if (payload.type === "local-asset-response") {
-          // Handle asset responses if needed
+        if (payload.type === "local-asset-url") {
+          // Handle asset URL response - update button images
+          const { assetPath, url } = payload;
+          if (button) {
+            const defaultImg = button.querySelector(".button-image.default");
+            const pressedImg = button.querySelector(".button-image.pressed");
+            
+            if (assetPath === "tftm_promotebutton_default.png" && defaultImg && url) {
+              defaultImg.style.backgroundImage = `url('${url}')`;
+              defaultImg.style.backgroundSize = "contain";
+              defaultImg.style.backgroundPosition = "center";
+              defaultImg.style.backgroundRepeat = "no-repeat";
+            } else if (assetPath === "tftm_promotebutton_pressed.png" && pressedImg && url) {
+              pressedImg.style.backgroundImage = `url('${url}')`;
+              pressedImg.style.backgroundSize = "contain";
+              pressedImg.style.backgroundPosition = "center";
+              pressedImg.style.backgroundRepeat = "no-repeat";
+            }
+          }
         }
       } catch (e) {
         // Ignore parse errors
@@ -207,12 +225,15 @@
     .${BUTTON_CLASS} {
       pointer-events: auto;
       -webkit-user-select: none;
-      list-style-type: none;
       cursor: pointer;
+      box-sizing: border-box;
+      height: 20px;
+      width: 20px;
+      position: absolute !important;
       display: block !important;
-      height: 25px;
-      width: 25px;
       z-index: 1;
+      margin: 0;
+      padding: 0;
     }
 
     .${BUTTON_CLASS}[data-hidden],
@@ -222,65 +243,44 @@
       visibility: hidden !important;
     }
 
-    .${BUTTON_CLASS} .outer-mask {
+    .${BUTTON_CLASS} .button-image {
       pointer-events: auto;
       -webkit-user-select: none;
-      list-style-type: none;
-      cursor: pointer;
-      border-radius: 50%;
-      box-shadow: 0 0 4px 1px rgba(1,10,19,.25);
-      box-sizing: border-box;
-      height: 100%;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .${BUTTON_CLASS} .frame-color {
-      --champion-preview-hover-animation-percentage: 0%;
-      --column-height: 95px;
-      --font-display: "LoL Display","Times New Roman",Times,Baskerville,Georgia,serif;
-      --font-body: "LoL Body",Arial,"Helvetica Neue",Helvetica,sans-serif;
-      pointer-events: auto;
-      -webkit-user-select: none;
-      list-style-type: none;
-      cursor: default;
-      background-image: linear-gradient(0deg,#695625 0,#a9852d 23%,#b88d35 93%,#c8aa6e);
-      box-sizing: border-box;
-      height: 100%;
-      overflow: hidden;
-      width: 100%;
-      padding: 2px;
-    }
-
-    .${BUTTON_CLASS} .content {
-      pointer-events: auto;
-      -webkit-user-select: none;
-      list-style-type: none;
       cursor: pointer;
       display: block;
-      background: url(/fe/lol-champ-select/images/config/button-chroma.png) no-repeat;
+      width: 100%;
+      height: 100%;
       background-size: contain;
-      border: 2px solid #010a13;
-      border-radius: 50%;
-      height: 16px;
-      margin: 1px;
-      width: 16px;
+      background-position: center;
+      background-repeat: no-repeat;
+      transition: opacity 0.1s ease;
+      position: absolute;
+      top: 0;
+      left: 0;
+      min-width: 20px;
+      min-height: 20px;
+    }
+    
+    .${BUTTON_CLASS} .button-image.default {
+      background-color: rgba(200, 155, 60, 0.5); /* Temporary fallback until image loads */
+      border: 1px solid rgba(200, 155, 60, 0.8);
+      border-radius: 2px;
     }
 
-    .${BUTTON_CLASS} .inner-mask {
-      -webkit-user-select: none;
-      list-style-type: none;
-      cursor: default;
-      border-radius: 50%;
-      box-sizing: border-box;
-      overflow: hidden;
-      pointer-events: none;
-      position: absolute;
-      box-shadow: inset 0 0 4px 4px rgba(0,0,0,.75);
-      width: calc(100% - 4px);
-      height: calc(100% - 4px);
-      left: 2px;
-      top: 2px;
+    .${BUTTON_CLASS} .button-image.default {
+      opacity: 1;
+    }
+
+    .${BUTTON_CLASS} .button-image.pressed {
+      opacity: 0;
+    }
+
+    .${BUTTON_CLASS}.pressed .button-image.default {
+      opacity: 0;
+    }
+
+    .${BUTTON_CLASS}.pressed .button-image.pressed {
+      opacity: 1;
     }
 
 
@@ -488,14 +488,39 @@
 
     button = document.createElement("div");
     button.className = BUTTON_CLASS;
-    button.innerHTML = `
-      <div class="outer-mask interactive">
-        <div class="frame-color">
-          <div class="content"></div>
-          <div class="inner-mask inner-shadow"></div>
-        </div>
-      </div>
-    `;
+    
+    // Create image elements for default and pressed states
+    const defaultImg = document.createElement("div");
+    defaultImg.className = "button-image default";
+    // Don't set background image yet - wait for HTTP URL from Python
+    
+    const pressedImg = document.createElement("div");
+    pressedImg.className = "button-image pressed";
+    // Don't set background image yet - wait for HTTP URL from Python
+    
+    button.appendChild(defaultImg);
+    button.appendChild(pressedImg);
+
+    // Request button images from Python backend
+    if (bridgeReady) {
+      emit({
+        type: "request-local-asset",
+        assetPath: "tftm_promotebutton_default.png",
+      });
+      emit({
+        type: "request-local-asset",
+        assetPath: "tftm_promotebutton_pressed.png",
+      });
+    } else {
+      bridgeQueue.push(JSON.stringify({
+        type: "request-local-asset",
+        assetPath: "tftm_promotebutton_default.png",
+      }));
+      bridgeQueue.push(JSON.stringify({
+        type: "request-local-asset",
+        assetPath: "tftm_promotebutton_pressed.png",
+      }));
+    }
 
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -649,6 +674,7 @@
     if (selectedModId === modId) {
       // Deselect
       selectedModId = null;
+      selectedModSkinId = null;
       buttonElement.textContent = "Select";
       buttonElement.classList.remove("selected");
 
@@ -680,13 +706,15 @@
 
       // Select new mod
       selectedModId = modId;
+      const state = window.__roseSkinState || {};
+      const skinId = Number(state.skinId);
+      selectedModSkinId = skinId; // Store the skin ID for this selection
+      
       buttonElement.textContent = "Selected";
       buttonElement.classList.add("selected");
 
       // Emit selection to Python backend
-      const state = window.__roseSkinState || {};
       const championId = Number(state.championId);
-      const skinId = Number(state.skinId);
       
       if (championId && skinId) {
         emit({
@@ -708,9 +736,12 @@
     const modList = panel._modList;
     const loadingEl = panel._loadingEl;
 
+    // Store current selectedModId before clearing the list
+    const previousSelectedModId = selectedModId;
+    
     modList.innerHTML = "";
-    // Reset selection when mods change
-    selectedModId = null;
+    
+    // Don't reset selection - restore it if it still exists in the mod list
 
     if (!mods || mods.length === 0) {
       loadingEl.textContent = "No mods found";
@@ -752,8 +783,15 @@
       // Select button
       const selectButton = document.createElement("button");
       selectButton.className = "mod-select-button";
-      selectButton.textContent = selectedModId === modId ? "Selected" : "Select";
-      if (selectedModId === modId) {
+      // Restore selection if this mod was previously selected for the current skin
+      const isSelected = (selectedModId === modId || previousSelectedModId === modId) && 
+                         selectedModSkinId === currentSkinData?.skinId;
+      if (isSelected && previousSelectedModId === modId) {
+        selectedModId = modId; // Restore the selection
+        selectedModSkinId = currentSkinData?.skinId; // Restore the skin ID
+      }
+      selectButton.textContent = isSelected ? "Selected" : "Select";
+      if (isSelected) {
         selectButton.classList.add("selected");
       }
       selectButton.addEventListener("click", (e) => {
@@ -793,39 +831,17 @@
     return null;
   }
 
-  function findRandomSkinButton() {
-    // Find the random skin button element
-    const randomButton = document.querySelector(".lu-random-dice-button");
-    if (randomButton) {
-      return randomButton;
-    }
-    return null;
-  }
-
   function findButtonLocation() {
-    // First, try to find the random skin button and position next to it
-    const randomButton = findRandomSkinButton();
-    if (randomButton) {
-      const rect = randomButton.getBoundingClientRect();
-      // Position to the right of the random button with some spacing
-      return {
-        x: rect.right + 8, // 8px spacing to the right
-        y: rect.top,
-        width: 25,
-        height: 25,
-        relativeTo: randomButton
-      };
-    }
-
-    // Fallback: position similar to random button (centered below skin, but to the right)
+    // Position button to the right of where random button would be (centered below skin, but to the right)
     const allItems = document.querySelectorAll(".skin-selection-item");
     for (const item of allItems) {
       if (item.classList.contains("skin-carousel-offset-2")) {
         const rect = item.getBoundingClientRect();
         // Position to the right of where random button would be (centered + 38px + 8px spacing)
+        // Same Y level as random button (78px below skin item)
         return {
           x: rect.left + rect.width / 2 + 19 + 8, // Half width + random button width + spacing
-          y: rect.top + 78, // Same y as random button
+          y: rect.top + 78, // Same Y as random button
           width: 25,
           height: 25,
           relativeTo: item
@@ -838,7 +854,7 @@
       const rect = selectedItem.getBoundingClientRect();
       return {
         x: rect.left + rect.width / 2 + 19 + 8,
-        y: rect.top + 78,
+        y: rect.top + 78, // Same Y as random button
         width: 25,
         height: 25,
         relativeTo: selectedItem
@@ -856,13 +872,13 @@
     createButton();
     createPanel();
 
-    const targetContainer = findButtonContainer();
-    if (!targetContainer) {
+    const location = findButtonLocation();
+    if (!location) {
       return;
     }
 
-    const location = findButtonLocation();
-    if (!location) {
+    const targetContainer = findButtonContainer();
+    if (!targetContainer) {
       return;
     }
 
@@ -880,12 +896,16 @@
       targetContainer.style.position = 'relative';
     }
 
-    // Position button absolutely within container
-    button.style.position = "absolute";
-    button.style.left = `${location.x - containerRect.left}px`;
-    button.style.top = `${location.y - containerRect.top}px`;
-    button.style.width = `${location.width}px`;
-    button.style.height = `${location.height}px`;
+    // Calculate position relative to container
+    const left = location.x - containerRect.left;
+    const top = location.y - containerRect.top;
+
+    // Position button absolutely within container - use setProperty to ensure it applies
+    button.style.setProperty('position', 'absolute', 'important');
+    button.style.setProperty('left', `${left}px`, 'important');
+    button.style.setProperty('top', `${top}px`, 'important');
+    button.style.setProperty('width', `${location.width}px`, 'important');
+    button.style.setProperty('height', `${location.height}px`, 'important');
     button.style.zIndex = "1"; // Above random button (which is z-index 0)
     button.style.display = "block";
     button.style.visibility = "visible";
@@ -894,8 +914,13 @@
     // Remove the default positioning classes that might interfere
     button.style.bottom = "";
     button.style.transform = "";
+    button.style.margin = "0";
+    button.style.padding = "0";
 
     targetContainer.appendChild(button);
+    
+    // Force browser to apply the position (after appending to DOM)
+    void button.offsetHeight; // Trigger reflow
 
     // Store references for repositioning
     button._relativeTo = location.relativeTo;
@@ -978,6 +1003,12 @@
     }, 0);
 
     isOpen = true;
+    
+    // Update button pressed state
+    if (button) {
+      button.classList.add("pressed");
+    }
+    
     requestModsForCurrentSkin();
 
     // Add click outside handler
@@ -1000,6 +1031,10 @@
   function closePanel() {
     if (!panel) {
       isOpen = false;
+      // Update button pressed state
+      if (button) {
+        button.classList.remove("pressed");
+      }
       return;
     }
     // Hide panel but keep it in DOM for reuse
@@ -1008,6 +1043,11 @@
       panel.style.pointerEvents = "none";
     }
     isOpen = false;
+    
+    // Update button pressed state
+    if (button) {
+      button.classList.remove("pressed");
+    }
   }
 
   function requestModsForCurrentSkin() {
@@ -1015,8 +1055,13 @@
     const championId = Number(state.championId);
     const skinId = Number(state.skinId);
 
-    // Reset selection when skin changes
-    selectedModId = null;
+    // Only reset selection if skin actually changed
+    if (selectedModId && selectedModSkinId !== skinId) {
+      // Skin changed, reset selection
+      selectedModId = null;
+      selectedModSkinId = null;
+    }
+    // If same skin, keep the selection
 
     if (!championId || !skinId) {
       if (panel && panel._loadingEl) {
@@ -1055,6 +1100,16 @@
     const skinId = Number(detail?.skinId);
     if (!championId || !skinId) {
       return;
+    }
+
+    // Store current skin data for selection restoration
+    currentSkinData = { championId, skinId };
+    
+    // Only restore selection if it's for the same skin
+    if (selectedModId && selectedModSkinId !== skinId) {
+      // Skin changed, clear selection
+      selectedModId = null;
+      selectedModSkinId = null;
     }
 
     const mods = Array.isArray(detail.mods) ? detail.mods : [];
@@ -1098,14 +1153,18 @@
     window.addEventListener(EVENT_LOCK_STATE, handleChampionLocked, {
       passive: true,
     });
-    // Reposition button when random button moves or skin changes
+    // Reposition button when skin changes
     const repositionButton = () => {
       if (button && button.parentNode && championLocked) {
         const location = findButtonLocation();
         if (location && button._container) {
           const containerRect = button._container.getBoundingClientRect();
-          button.style.left = `${location.x - containerRect.left}px`;
-          button.style.top = `${location.y - containerRect.top}px`;
+          const newLeft = location.x - containerRect.left;
+          const newTop = location.y - containerRect.top;
+          button.style.setProperty('left', `${newLeft}px`, 'important');
+          button.style.setProperty('top', `${newTop}px`, 'important');
+          // Force browser to apply the position
+          void button.offsetHeight; // Trigger reflow
         }
       }
       if (isOpen && panel && button) {
@@ -1115,16 +1174,5 @@
 
     window.addEventListener("resize", repositionButton);
     window.addEventListener("scroll", repositionButton);
-
-    // Observe for random button changes
-    const observeRandomButton = () => {
-      const randomButton = findRandomSkinButton();
-      if (randomButton && button && button.parentNode) {
-        repositionButton();
-      }
-    };
-
-    // Check periodically for random button
-    setInterval(observeRandomButton, 500);
   });
 })();
