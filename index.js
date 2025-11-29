@@ -11,7 +11,6 @@
   const PANEL_CLASS = "lu-chroma-panel";
   const PANEL_ID = "rose-custom-wheel-panel-container";
   const REQUEST_TYPE = "request-skin-mods";
-  const OPEN_FOLDER_TYPE = "open-mods-folder";
   const EVENT_SKIN_STATE = "lu-skin-monitor-state";
   const EVENT_MODS_RESPONSE = "rose-custom-wheel-skin-mods";
   const EVENT_LOCK_STATE = "rose-custom-wheel-champion-locked";
@@ -24,6 +23,7 @@
   let championSelectObserver = null;
   let championLocked = false;
   let currentSkinData = null;
+  let selectedModId = null; // Track which mod is currently selected
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
@@ -430,26 +430,43 @@
       padding: 10px;
     }
 
-    .${PANEL_CLASS} .mod-open-folder {
-      background: transparent;
+    .${PANEL_CLASS} .mod-select-button {
+      background: rgba(200, 155, 60, 0.2);
       border: 1px solid rgba(200, 155, 60, 0.5);
       border-radius: 4px;
-      padding: 6px 12px;
+      padding: 4px 12px;
       color: #c89b3c;
       font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
       font-size: 11px;
       cursor: pointer;
       transition: all 0.15s ease;
-      margin: 0 0 12px 0;
+      margin-top: 6px;
       align-self: flex-start;
-      width: 100%;
-      box-sizing: border-box;
     }
 
-    .${PANEL_CLASS} .mod-open-folder:hover {
-      background: rgba(200, 155, 60, 0.1);
+    .${PANEL_CLASS} .mod-select-button:hover {
+      background: rgba(200, 155, 60, 0.3);
       border-color: #c89b3c;
     }
+
+    .${PANEL_CLASS} .mod-select-button.selected {
+      background: rgba(200, 155, 60, 0.4);
+      border-color: #c89b3c;
+      color: #f0e6d2;
+    }
+
+    .${PANEL_CLASS} .mod-injection-note {
+      color: rgba(247, 240, 222, 0.5);
+      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+      font-size: 10px;
+      font-style: italic;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
   `;
 
   function injectCSS() {
@@ -562,23 +579,19 @@
     modList.style.width = "100%";
     modList.style.gap = "4px";
 
+    // Injection note
+    const injectionNote = document.createElement("div");
+    injectionNote.className = "mod-injection-note";
+    injectionNote.textContent = "Selected mods will be injected over the hovered skin";
+
     // Loading element
     const loadingEl = document.createElement("div");
     loadingEl.className = "mod-loading";
     loadingEl.textContent = "Waiting for mods…";
     loadingEl.style.display = "none";
 
-    // Open folder button
-    const openFolderBtn = document.createElement("button");
-    openFolderBtn.className = "mod-open-folder";
-    openFolderBtn.textContent = "Open Mods Folder";
-    openFolderBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      emit({ type: OPEN_FOLDER_TYPE });
-    });
-
+    scrollable.appendChild(injectionNote);
     scrollable.appendChild(loadingEl);
-    scrollable.appendChild(openFolderBtn);
     scrollable.appendChild(modList);
 
     modal.appendChild(scrollable);
@@ -631,6 +644,62 @@
     flyoutFrame.style.pointerEvents = "all";
   }
 
+  function handleModSelect(modId, buttonElement, modData) {
+    // Toggle selection
+    if (selectedModId === modId) {
+      // Deselect
+      selectedModId = null;
+      buttonElement.textContent = "Select";
+      buttonElement.classList.remove("selected");
+
+      // Emit deselection to Python backend (modId: null means deselect)
+      const state = window.__roseSkinState || {};
+      const championId = Number(state.championId);
+      const skinId = Number(state.skinId);
+      
+      if (championId && skinId) {
+        emit({
+          type: "select-skin-mod",
+          championId,
+          skinId,
+          modId: null, // null means deselect
+          modData: null,
+        });
+      }
+    } else {
+      // Deselect previous button if any
+      if (selectedModId) {
+        const previousButton = panel?._modList?.querySelector(
+          `[data-mod-id="${selectedModId}"] .mod-select-button`
+        );
+        if (previousButton) {
+          previousButton.textContent = "Select";
+          previousButton.classList.remove("selected");
+        }
+      }
+
+      // Select new mod
+      selectedModId = modId;
+      buttonElement.textContent = "Selected";
+      buttonElement.classList.add("selected");
+
+      // Emit selection to Python backend
+      const state = window.__roseSkinState || {};
+      const championId = Number(state.championId);
+      const skinId = Number(state.skinId);
+      
+      if (championId && skinId) {
+        emit({
+          type: "select-skin-mod",
+          championId,
+          skinId,
+          modId,
+          modData,
+        });
+      }
+    }
+  }
+
   function updateModEntries(mods) {
     if (!panel || !panel._modList || !panel._loadingEl) {
       return;
@@ -640,6 +709,8 @@
     const loadingEl = panel._loadingEl;
 
     modList.innerHTML = "";
+    // Reset selection when mods change
+    selectedModId = null;
 
     if (!mods || mods.length === 0) {
       loadingEl.textContent = "No mods found";
@@ -651,6 +722,8 @@
 
     mods.forEach((mod) => {
       const listItem = document.createElement("li");
+      // Use relativePath as the unique identifier, fallback to modName
+      const modId = mod.relativePath || mod.modName || `mod-${Date.now()}-${Math.random()}`;
 
       const modName = document.createElement("div");
       modName.className = "mod-name";
@@ -675,6 +748,22 @@
       }
       modMeta.textContent = parts.join(" • ");
       listItem.appendChild(modMeta);
+
+      // Select button
+      const selectButton = document.createElement("button");
+      selectButton.className = "mod-select-button";
+      selectButton.textContent = selectedModId === modId ? "Selected" : "Select";
+      if (selectedModId === modId) {
+        selectButton.classList.add("selected");
+      }
+      selectButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleModSelect(modId, selectButton, mod);
+      });
+      listItem.appendChild(selectButton);
+
+      // Store mod ID on list item for easy reference
+      listItem.setAttribute("data-mod-id", modId);
 
       modList.appendChild(listItem);
     });
@@ -925,6 +1014,9 @@
     const state = window.__roseSkinState || {};
     const championId = Number(state.championId);
     const skinId = Number(state.skinId);
+
+    // Reset selection when skin changes
+    selectedModId = null;
 
     if (!championId || !skinId) {
       if (panel && panel._loadingEl) {
