@@ -1548,11 +1548,29 @@
 
     const location = findButtonLocation();
     if (!location) {
+      // Retry after a short delay if location not found (DOM might not be ready)
+      setTimeout(() => {
+        if (championLocked && championSelectRoot) {
+          const retryLocation = findButtonLocation();
+          if (retryLocation) {
+            attachToChampionSelect();
+          }
+        }
+      }, 100);
       return;
     }
 
     const targetContainer = findButtonContainer();
     if (!targetContainer) {
+      // Retry after a short delay if container not found (DOM might not be ready)
+      setTimeout(() => {
+        if (championLocked && championSelectRoot) {
+          const retryContainer = findButtonContainer();
+          if (retryContainer) {
+            attachToChampionSelect();
+          }
+        }
+      }, 100);
       return;
     }
 
@@ -1624,6 +1642,10 @@
   function updateChampionSelectTarget() {
     const target = document.querySelector(".champion-select");
     if (target === championSelectRoot) {
+      // Even if target is the same, check if button needs to be attached
+      if (championLocked && target && (!button || !button.parentNode)) {
+        refreshUIVisibility();
+      }
       return;
     }
     championSelectRoot = target;
@@ -1919,6 +1941,10 @@
   function handleChampionLocked(event) {
     const locked = Boolean(event?.detail?.locked);
     if (locked === championLocked) {
+      // Even if state is the same, ensure button is attached if it should be
+      if (locked && championSelectRoot && (!button || !button.parentNode)) {
+        refreshUIVisibility();
+      }
       return;
     }
     
@@ -1934,6 +1960,15 @@
     
     championLocked = locked;
     refreshUIVisibility();
+    
+    // Additional retry after lock state changes to ensure button appears
+    if (locked) {
+      setTimeout(() => {
+        if (championLocked && championSelectRoot && (!button || !button.parentNode)) {
+          refreshUIVisibility();
+        }
+      }, 200);
+    }
   }
 
   function whenReady(cb) {
@@ -1997,5 +2032,23 @@
 
     window.addEventListener("resize", repositionButton);
     window.addEventListener("scroll", repositionButton);
+    
+    // Periodic check to ensure button is attached on first champion select
+    // This handles cases where events fire before DOM is ready
+    let attachmentCheckInterval = setInterval(() => {
+      if (championLocked && championSelectRoot) {
+        if (!button || !button.parentNode) {
+          refreshUIVisibility();
+        } else {
+          // Button is attached, stop checking
+          clearInterval(attachmentCheckInterval);
+        }
+      }
+    }, 500);
+    
+    // Stop checking after 10 seconds to avoid infinite checking
+    setTimeout(() => {
+      clearInterval(attachmentCheckInterval);
+    }, 10000);
   });
 })();
