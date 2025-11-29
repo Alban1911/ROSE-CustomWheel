@@ -1598,6 +1598,13 @@
     if (button) {
       button.classList.remove("pressed");
     }
+    
+    // Clear all selections when panel closes
+    selectedModId = null;
+    selectedModSkinId = null;
+    selectedMapId = null;
+    selectedFontId = null;
+    selectedAnnouncerId = null;
   }
 
   function requestModsForCurrentSkin() {
@@ -1743,6 +1750,16 @@
     if (locked === championLocked) {
       return;
     }
+    
+    // If a new champion is being locked, clear all selections
+    if (locked && !championLocked) {
+      selectedModId = null;
+      selectedModSkinId = null;
+      selectedMapId = null;
+      selectedFontId = null;
+      selectedAnnouncerId = null;
+    }
+    
     championLocked = locked;
     refreshUIVisibility();
   }
