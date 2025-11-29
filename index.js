@@ -408,11 +408,19 @@
       border-color: rgba(200, 155, 60, 0.3);
     }
 
+    .${PANEL_CLASS} .mod-name-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    
     .${PANEL_CLASS} .mod-name {
       color: #f7f0de;
       font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
       font-size: 13px;
       font-weight: 600;
+      flex: 1;
     }
 
     .${PANEL_CLASS} .mod-description {
@@ -448,8 +456,7 @@
       font-size: 11px;
       cursor: pointer;
       transition: all 0.15s ease;
-      margin-top: 6px;
-      align-self: flex-start;
+      flex-shrink: 0;
     }
 
     .${PANEL_CLASS} .mod-select-button:hover {
@@ -787,13 +794,7 @@
     announcersLoading.textContent = "Loading announcers…";
     announcersLoading.style.display = "none";
 
-    // Injection note for mods
-    const injectionNote = document.createElement("div");
-    injectionNote.className = "mod-injection-note";
-    injectionNote.textContent = "Selected mods will be injected over the hovered skin";
-
     // Assemble mods content
-    modsContent.appendChild(injectionNote);
     modsContent.appendChild(modsLoading);
     modsContent.appendChild(modList);
 
@@ -965,29 +966,14 @@
       // Use relativePath as the unique identifier, fallback to modName
       const modId = mod.relativePath || mod.modName || `mod-${Date.now()}-${Math.random()}`;
 
+      // Create a row container for name and button
+      const modNameRow = document.createElement("div");
+      modNameRow.className = "mod-name-row";
+
       const modName = document.createElement("div");
       modName.className = "mod-name";
       modName.textContent = mod.modName || "Unnamed mod";
-      listItem.appendChild(modName);
-
-      if (mod.description) {
-        const modDesc = document.createElement("div");
-        modDesc.className = "mod-description";
-        modDesc.textContent = mod.description;
-        listItem.appendChild(modDesc);
-      }
-
-      const modMeta = document.createElement("div");
-      modMeta.className = "mod-meta";
-      const parts = [];
-      if (mod.relativePath) {
-        parts.push(mod.relativePath);
-      }
-      if (mod.updatedAt) {
-        parts.push(formatTimestamp(mod.updatedAt));
-      }
-      modMeta.textContent = parts.join(" • ");
-      listItem.appendChild(modMeta);
+      modNameRow.appendChild(modName);
 
       // Select button
       const selectButton = document.createElement("button");
@@ -1007,10 +993,19 @@
         e.stopPropagation();
         handleModSelect(modId, selectButton, mod);
       });
-      listItem.appendChild(selectButton);
+
+      modNameRow.appendChild(selectButton);
+      listItem.appendChild(modNameRow);
 
       // Store mod ID on list item for easy reference
       listItem.setAttribute("data-mod-id", modId);
+
+      if (mod.description) {
+        const modDesc = document.createElement("div");
+        modDesc.className = "mod-description";
+        modDesc.textContent = mod.description;
+        listItem.appendChild(modDesc);
+      }
 
       modList.appendChild(listItem);
     });
@@ -1038,26 +1033,14 @@
       const listItem = document.createElement("li");
       const mapId = map.id || map.name || `map-${Date.now()}-${Math.random()}`;
 
+      // Create a row container for name and button
+      const mapNameRow = document.createElement("div");
+      mapNameRow.className = "mod-name-row";
+
       const mapName = document.createElement("div");
       mapName.className = "mod-name";
       mapName.textContent = map.name || "Unnamed map";
-      listItem.appendChild(mapName);
-
-      if (map.description) {
-        const mapDesc = document.createElement("div");
-        mapDesc.className = "mod-description";
-        mapDesc.textContent = map.description;
-        listItem.appendChild(mapDesc);
-      }
-
-      const mapMeta = document.createElement("div");
-      mapMeta.className = "mod-meta";
-      const parts = [];
-      if (map.path) {
-        parts.push(map.path);
-      }
-      mapMeta.textContent = parts.join(" • ");
-      listItem.appendChild(mapMeta);
+      mapNameRow.appendChild(mapName);
 
       const selectButton = document.createElement("button");
       selectButton.className = "mod-select-button";
@@ -1075,7 +1058,16 @@
         handleMapSelect(mapId, selectButton, map);
       });
 
-      listItem.appendChild(selectButton);
+      mapNameRow.appendChild(selectButton);
+      listItem.appendChild(mapNameRow);
+
+      if (map.description) {
+        const mapDesc = document.createElement("div");
+        mapDesc.className = "mod-description";
+        mapDesc.textContent = map.description;
+        listItem.appendChild(mapDesc);
+      }
+
       mapsListEl.appendChild(listItem);
     });
   }
@@ -1102,26 +1094,14 @@
       const listItem = document.createElement("li");
       const fontId = font.id || font.name || `font-${Date.now()}-${Math.random()}`;
 
+      // Create a row container for name and button
+      const fontNameRow = document.createElement("div");
+      fontNameRow.className = "mod-name-row";
+
       const fontName = document.createElement("div");
       fontName.className = "mod-name";
       fontName.textContent = font.name || "Unnamed font";
-      listItem.appendChild(fontName);
-
-      if (font.description) {
-        const fontDesc = document.createElement("div");
-        fontDesc.className = "mod-description";
-        fontDesc.textContent = font.description;
-        listItem.appendChild(fontDesc);
-      }
-
-      const fontMeta = document.createElement("div");
-      fontMeta.className = "mod-meta";
-      const parts = [];
-      if (font.path) {
-        parts.push(font.path);
-      }
-      fontMeta.textContent = parts.join(" • ");
-      listItem.appendChild(fontMeta);
+      fontNameRow.appendChild(fontName);
 
       const selectButton = document.createElement("button");
       selectButton.className = "mod-select-button";
@@ -1139,7 +1119,16 @@
         handleFontSelect(fontId, selectButton, font);
       });
 
-      listItem.appendChild(selectButton);
+      fontNameRow.appendChild(selectButton);
+      listItem.appendChild(fontNameRow);
+
+      if (font.description) {
+        const fontDesc = document.createElement("div");
+        fontDesc.className = "mod-description";
+        fontDesc.textContent = font.description;
+        listItem.appendChild(fontDesc);
+      }
+
       fontsListEl.appendChild(listItem);
     });
   }
@@ -1166,26 +1155,14 @@
       const listItem = document.createElement("li");
       const announcerId = announcer.id || announcer.name || `announcer-${Date.now()}-${Math.random()}`;
 
+      // Create a row container for name and button
+      const announcerNameRow = document.createElement("div");
+      announcerNameRow.className = "mod-name-row";
+
       const announcerName = document.createElement("div");
       announcerName.className = "mod-name";
       announcerName.textContent = announcer.name || "Unnamed announcer";
-      listItem.appendChild(announcerName);
-
-      if (announcer.description) {
-        const announcerDesc = document.createElement("div");
-        announcerDesc.className = "mod-description";
-        announcerDesc.textContent = announcer.description;
-        listItem.appendChild(announcerDesc);
-      }
-
-      const announcerMeta = document.createElement("div");
-      announcerMeta.className = "mod-meta";
-      const parts = [];
-      if (announcer.path) {
-        parts.push(announcer.path);
-      }
-      announcerMeta.textContent = parts.join(" • ");
-      listItem.appendChild(announcerMeta);
+      announcerNameRow.appendChild(announcerName);
 
       const selectButton = document.createElement("button");
       selectButton.className = "mod-select-button";
@@ -1203,7 +1180,16 @@
         handleAnnouncerSelect(announcerId, selectButton, announcer);
       });
 
-      listItem.appendChild(selectButton);
+      announcerNameRow.appendChild(selectButton);
+      listItem.appendChild(announcerNameRow);
+
+      if (announcer.description) {
+        const announcerDesc = document.createElement("div");
+        announcerDesc.className = "mod-description";
+        announcerDesc.textContent = announcer.description;
+        listItem.appendChild(announcerDesc);
+      }
+
       announcersListEl.appendChild(listItem);
     });
   }
