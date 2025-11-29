@@ -317,7 +317,7 @@
       background: #000;
       display: flex;
       flex-direction: column;
-      width: 305px;
+      width: auto;
       position: relative;
       z-index: 0;
       padding: 16px;
@@ -334,6 +334,7 @@
       overflow: visible;
       pointer-events: all;
       -webkit-user-select: none;
+      width: auto !important;
     }
 
     .${PANEL_CLASS}[data-no-button] .flyout {
@@ -344,6 +345,7 @@
     .${PANEL_CLASS} .flyout-frame {
       position: relative;
       transition: 250ms all cubic-bezier(0.02, 0.85, 0.08, 0.99);
+      width: auto !important;
     }
     
     .${PANEL_CLASS} .flyout .caret,
@@ -358,6 +360,7 @@
     
     .${PANEL_CLASS} .lc-flyout-content {
       position: relative;
+      width: auto;
     }
 
     .${PANEL_CLASS} .mod-selection {
@@ -369,7 +372,7 @@
       -webkit-mask-box-image-slice: 0 8 18 0 fill;
       display: flex;
       flex-direction: column;
-      width: 100%;
+      width: auto;
       position: relative;
       z-index: 1;
       min-height: 150px;
@@ -488,42 +491,25 @@
       margin-bottom: 12px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       padding-bottom: 8px;
+      width: fit-content;
+      flex-wrap: nowrap;
     }
 
     .${PANEL_CLASS} .tab-button {
-      flex: 1;
-      padding: 6px 12px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      color: rgba(247, 240, 222, 0.7);
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
-      font-size: 11px;
-      font-weight: 500;
       cursor: pointer;
-      transition: all 0.15s ease;
-      text-align: center;
-    }
-
-    .${PANEL_CLASS} .tab-button:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(200, 155, 60, 0.3);
-      color: rgba(247, 240, 222, 0.9);
-    }
-
-    .${PANEL_CLASS} .tab-button.active {
-      background: rgba(200, 155, 60, 0.2);
-      border-color: rgba(200, 155, 60, 0.5);
-      color: #c89b3c;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .${PANEL_CLASS} .tab-content {
       display: none;
+      width: auto;
     }
 
     .${PANEL_CLASS} .tab-content.active {
       display: flex;
       flex-direction: column;
+      width: auto;
     }
 
   `;
@@ -645,23 +631,23 @@
     const tabContainer = document.createElement("div");
     tabContainer.className = "tab-container";
 
-    // Create tabs
-    const modsTab = document.createElement("button");
+    // Create tabs using League UI components
+    const modsTab = document.createElement("lol-uikit-flat-button-secondary");
     modsTab.className = "tab-button active";
     modsTab.textContent = "Skins";
     modsTab.dataset.tab = "skins";
     
-    const mapsTab = document.createElement("button");
+    const mapsTab = document.createElement("lol-uikit-flat-button-secondary");
     mapsTab.className = "tab-button";
     mapsTab.textContent = "Maps";
     mapsTab.dataset.tab = "maps";
     
-    const fontsTab = document.createElement("button");
+    const fontsTab = document.createElement("lol-uikit-flat-button-secondary");
     fontsTab.className = "tab-button";
     fontsTab.textContent = "Fonts";
     fontsTab.dataset.tab = "fonts";
     
-    const announcersTab = document.createElement("button");
+    const announcersTab = document.createElement("lol-uikit-flat-button-secondary");
     announcersTab.className = "tab-button";
     announcersTab.textContent = "Announcers";
     announcersTab.dataset.tab = "announcers";
@@ -834,6 +820,61 @@
     panel._announcersContent = announcersContent;
     panel._loadingEl = modsLoading; // Keep for backward compatibility
 
+    // Function to calculate and set panel width to exactly match tab container width
+    const calculateWidth = () => {
+      const tabContainerEl = modal.querySelector(".tab-container");
+      if (!tabContainerEl) return;
+      
+      // Remove all constraints to measure natural size
+      const originalModalWidth = modal.style.width;
+      const originalContainerWidth = tabContainerEl.style.width;
+      
+      tabContainerEl.style.width = "fit-content";
+      modal.style.width = "auto";
+      modal.style.maxWidth = "none";
+      modal.style.minWidth = "0";
+      
+      // Force reflow multiple times
+      void tabContainerEl.offsetWidth;
+      void modal.offsetWidth;
+      void tabContainerEl.offsetWidth;
+      
+      // Measure each tab button directly - this should be the most accurate
+      const tabs = tabContainerEl.querySelectorAll(".tab-button");
+      let totalTabWidth = 0;
+      
+      tabs.forEach((tab, index) => {
+        // Force each tab to render before measuring
+        void tab.offsetWidth;
+        const rect = tab.getBoundingClientRect();
+        totalTabWidth += rect.width;
+        if (index < tabs.length - 1) {
+          totalTabWidth += 4; // gap between tabs (from CSS gap: 4px)
+        }
+      });
+      
+      if (totalTabWidth > 0) {
+        // With box-sizing: border-box, width includes padding
+        // Try using just the tab width - maybe padding is already accounted for somehow
+        // Or the measurement is already including what we need
+        modal.style.width = `${totalTabWidth}px`;
+        modal.style.maxWidth = "";
+        modal.style.minWidth = "";
+        tabContainerEl.style.width = "fit-content";
+      } else {
+        modal.style.width = originalModalWidth;
+        tabContainerEl.style.width = originalContainerWidth;
+      }
+    };
+    
+    // Store on panel for later use
+    panel._calculateWidth = calculateWidth;
+    
+    // Try multiple times to ensure tabs are fully rendered
+    setTimeout(calculateWidth, 50);
+    setTimeout(calculateWidth, 150);
+    setTimeout(calculateWidth, 300);
+
     return panel;
   }
 
@@ -851,7 +892,8 @@
     let flyoutRect = flyoutFrame.getBoundingClientRect();
 
     if (flyoutRect.width === 0) {
-      flyoutRect = { width: 305, height: 300 };
+      // Use actual button width + padding as fallback
+      flyoutRect = { width: rect.width + 32, height: 300 };
     }
 
     const buttonCenterX = rect.left + rect.width / 2;
@@ -1455,6 +1497,10 @@
     // Reposition after render
     setTimeout(() => {
       positionPanel(panel, button);
+      // Recalculate width when panel opens to ensure tabs are fully rendered
+      if (panel._calculateWidth) {
+        panel._calculateWidth();
+      }
     }, 0);
 
     isOpen = true;
