@@ -323,12 +323,14 @@
       z-index: 0;
       padding: 16px;
       box-sizing: border-box;
+      overflow: hidden;
     }
     
     .${PANEL_CLASS} .chroma-modal.chroma-view {
-      height: 400px;
-      max-height: 400px;
-      min-height: 400px;
+      height: 400px !important;
+      max-height: 400px !important;
+      min-height: 400px !important;
+      overflow: hidden;
     }
     
     .${PANEL_CLASS} .flyout {
@@ -367,18 +369,19 @@
 
     .${PANEL_CLASS} .mod-selection {
       pointer-events: all;
-      flex: 1;
-      overflow: auto;
+      flex: 1 1 0;
+      overflow-y: auto;
+      overflow-x: hidden;
       transform: translateZ(0);
       -webkit-mask-box-image-source: url("/fe/lol-static-assets/images/uikit/scrollable/scrollable-content-gradient-mask-bottom.png");
       -webkit-mask-box-image-slice: 0 8 18 0 fill;
       display: flex;
       flex-direction: column;
-      width: auto;
+      width: 100%;
       position: relative;
       z-index: 1;
-      max-height: 350px;
-      min-height: 150px;
+      min-height: 0;
+      max-height: 100%;
     }
 
     .${PANEL_CLASS}[data-no-button] .mod-selection {
@@ -393,6 +396,7 @@
       display: flex;
       flex-direction: column;
       width: 100%;
+      min-width: 0;
       gap: 6px;
     }
 
@@ -407,6 +411,9 @@
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.08);
       transition: background 0.15s ease, border-color 0.15s ease;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .${PANEL_CLASS} .mod-selection li:hover {
@@ -419,6 +426,8 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      width: 100%;
+      min-width: 0;
     }
     
     .${PANEL_CLASS} .mod-name {
@@ -427,6 +436,10 @@
       font-size: 13px;
       font-weight: 600;
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .${PANEL_CLASS} .mod-description {
@@ -434,6 +447,9 @@
       font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
       font-size: 11px;
       font-weight: 400;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
     }
 
     .${PANEL_CLASS} .mod-meta {
@@ -496,6 +512,7 @@
       padding-bottom: 8px;
       width: fit-content;
       flex-wrap: nowrap;
+      flex-shrink: 0;
     }
 
     .${PANEL_CLASS} .tab-button {
@@ -506,13 +523,15 @@
 
     .${PANEL_CLASS} .tab-content {
       display: none;
-      width: auto;
+      width: 100%;
+      min-width: 0;
     }
 
     .${PANEL_CLASS} .tab-content.active {
       display: flex;
       flex-direction: column;
-      width: auto;
+      width: 100%;
+      min-width: 0;
     }
 
   `;
@@ -842,13 +861,15 @@
     othersContent.appendChild(othersLoading);
     othersContent.appendChild(othersList);
 
-    scrollable.appendChild(tabContainer);
+    // Add tab content to scrollable (tabs stay fixed outside)
     scrollable.appendChild(modsContent);
     scrollable.appendChild(mapsContent);
     scrollable.appendChild(fontsContent);
     scrollable.appendChild(announcersContent);
     scrollable.appendChild(othersContent);
 
+    // Add tab container and scrollable to modal (tabs outside scrollable)
+    modal.appendChild(tabContainer);
     modal.appendChild(scrollable);
     flyoutContent.appendChild(modal);
     flyoutFrame.appendChild(flyoutContent);
