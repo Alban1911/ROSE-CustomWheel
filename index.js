@@ -259,11 +259,13 @@
       left: 0;
       min-width: 20px;
       min-height: 20px;
+      background-color: transparent !important;
+      border: none !important;
     }
     
     .${BUTTON_CLASS} .button-image.default {
-      background-color: rgba(200, 155, 60, 0.5); /* Temporary fallback until image loads */
-      border: 1px solid rgba(200, 155, 60, 0.8);
+      background-color: transparent;
+      border: none;
       border-radius: 2px;
     }
 
@@ -273,6 +275,8 @@
 
     .${BUTTON_CLASS} .button-image.pressed {
       opacity: 0;
+      background-color: transparent !important;
+      border: none !important;
     }
 
     .${BUTTON_CLASS}.pressed .button-image.default {
