@@ -683,10 +683,22 @@
       }
     };
 
-    modsTab.addEventListener("click", () => switchTab("skins"));
-    mapsTab.addEventListener("click", () => switchTab("maps"));
-    fontsTab.addEventListener("click", () => switchTab("fonts"));
-    announcersTab.addEventListener("click", () => switchTab("announcers"));
+    modsTab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      switchTab("skins");
+    });
+    mapsTab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      switchTab("maps");
+    });
+    fontsTab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      switchTab("fonts");
+    });
+    announcersTab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      switchTab("announcers");
+    });
 
     tabContainer.appendChild(modsTab);
     tabContainer.appendChild(mapsTab);
@@ -1545,6 +1557,12 @@
 
     // Add click outside handler
     const closeHandler = (e) => {
+      // Check if click is on a tab button (they might be custom elements)
+      const clickedTab = e.target.closest(".tab-button");
+      if (clickedTab) {
+        return; // Don't close if clicking on a tab
+      }
+      
       if (
         panel &&
         panel.parentNode &&
