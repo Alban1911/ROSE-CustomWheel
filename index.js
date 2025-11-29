@@ -681,15 +681,33 @@
           content.classList.remove("active");
         }
       });
-      // Request data for the active tab
+      // Request data for the active tab, or show cached data if available
       if (tabName === "skins") {
         requestModsForCurrentSkin();
       } else if (tabName === "maps") {
-        requestMaps();
+        if (maps.length > 0) {
+          // Show cached data immediately
+          updateMapsEntries(maps);
+        } else {
+          // Request if no cached data
+          requestMaps();
+        }
       } else if (tabName === "fonts") {
-        requestFonts();
+        if (fonts.length > 0) {
+          // Show cached data immediately
+          updateFontsEntries(fonts);
+        } else {
+          // Request if no cached data
+          requestFonts();
+        }
       } else if (tabName === "announcers") {
-        requestAnnouncers();
+        if (announcers.length > 0) {
+          // Show cached data immediately
+          updateAnnouncersEntries(announcers);
+        } else {
+          // Request if no cached data
+          requestAnnouncers();
+        }
       }
     };
 
@@ -925,13 +943,17 @@
       const championId = Number(state.championId);
       
       if (championId && skinId) {
-        emit({
+        const payload = {
           type: "select-skin-mod",
           championId,
           skinId,
           modId,
           modData,
-        });
+        };
+        console.log(`[ROSE-CustomWheel] Sending mod selection:`, payload);
+        emit(payload);
+      } else {
+        console.warn(`[ROSE-CustomWheel] Cannot send mod selection - missing championId or skinId:`, { championId, skinId });
       }
     }
   }
@@ -1615,7 +1637,7 @@
   }
 
   function handleMapsResponse(event) {
-    if (!isOpen || activeTab !== "maps") {
+    if (!isOpen) {
       return;
     }
 
@@ -1625,11 +1647,14 @@
     }
 
     maps = Array.isArray(detail.maps) ? detail.maps : [];
-    updateMapsEntries(maps);
+    // Only update UI if maps tab is active
+    if (activeTab === "maps") {
+      updateMapsEntries(maps);
+    }
   }
 
   function handleFontsResponse(event) {
-    if (!isOpen || activeTab !== "fonts") {
+    if (!isOpen) {
       return;
     }
 
@@ -1639,11 +1664,14 @@
     }
 
     fonts = Array.isArray(detail.fonts) ? detail.fonts : [];
-    updateFontsEntries(fonts);
+    // Only update UI if fonts tab is active
+    if (activeTab === "fonts") {
+      updateFontsEntries(fonts);
+    }
   }
 
   function handleAnnouncersResponse(event) {
-    if (!isOpen || activeTab !== "announcers") {
+    if (!isOpen) {
       return;
     }
 
@@ -1653,7 +1681,10 @@
     }
 
     announcers = Array.isArray(detail.announcers) ? detail.announcers : [];
-    updateAnnouncersEntries(announcers);
+    // Only update UI if announcers tab is active
+    if (activeTab === "announcers") {
+      updateAnnouncersEntries(announcers);
+    }
   }
 
   function handleChampionLocked(event) {
