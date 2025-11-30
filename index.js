@@ -30,6 +30,8 @@
   let selectedFontId = null;
   let selectedAnnouncerId = null;
   let selectedOtherId = null;
+  let lastChampionSelectSession = null; // Track current champ select session
+  let isFirstOpenInSession = true; // Track if this is first open in current session
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
@@ -1648,6 +1650,11 @@
       }
       return;
     }
+    // New champion select detected - reset session tracking
+    if (target && target !== championSelectRoot) {
+      lastChampionSelectSession = target;
+      isFirstOpenInSession = true;
+    }
     championSelectRoot = target;
     refreshUIVisibility();
   }
@@ -1688,6 +1695,52 @@
     panel.style.display = "block";
     panel.style.pointerEvents = "none"; // Will be set to "all" by flyout frame
 
+    // Only switch to Skins tab on first open in this champ select session
+    // Otherwise, keep the last selected tab
+    if (isFirstOpenInSession) {
+      activeTab = "skins";
+      isFirstOpenInSession = false;
+    }
+    
+    const modsTab = panel.querySelector('.tab-button[data-tab="skins"]');
+    const mapsTab = panel.querySelector('.tab-button[data-tab="maps"]');
+    const fontsTab = panel.querySelector('.tab-button[data-tab="fonts"]');
+    const announcersTab = panel.querySelector('.tab-button[data-tab="announcers"]');
+    const othersTab = panel.querySelector('.tab-button[data-tab="others"]');
+    
+    // Update tab buttons based on activeTab
+    [modsTab, mapsTab, fontsTab, announcersTab, othersTab].forEach(tab => {
+      if (tab && tab.dataset.tab === activeTab) {
+        tab.classList.add("active");
+      } else if (tab) {
+        tab.classList.remove("active");
+      }
+    });
+    
+    // Update tab content based on activeTab
+    [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent, panel._othersContent].forEach(content => {
+      if (content) {
+        if (content.dataset.tab === activeTab) {
+          content.classList.add("active");
+        } else {
+          content.classList.remove("active");
+        }
+      }
+    });
+    
+    // Request data for the active tab
+    if (activeTab === "skins") {
+      requestModsForCurrentSkin();
+    } else if (activeTab === "maps") {
+      requestMaps();
+    } else if (activeTab === "fonts") {
+      requestFonts();
+    } else if (activeTab === "announcers") {
+      requestAnnouncers();
+    } else if (activeTab === "others") {
+      requestOthers();
+    }
+
     // Calculate width first, then position
     if (panel._calculateWidth) {
       panel._calculateWidth();
@@ -1716,7 +1769,7 @@
       button.classList.add("pressed");
     }
     
-    // Request data for all tabs when panel opens
+    // Request data for all tabs when panel opens (in background, but don't switch to them)
     requestModsForCurrentSkin();
     requestMaps();
     requestFonts();
@@ -1948,7 +2001,7 @@
       return;
     }
     
-    // If a new champion is being locked, clear all selections
+    // If a new champion is being locked, clear all selections and reset session
     if (locked && !championLocked) {
       selectedModId = null;
       selectedModSkinId = null;
@@ -1956,6 +2009,9 @@
       selectedFontId = null;
       selectedAnnouncerId = null;
       selectedOtherId = null;
+      // New champ select session - reset to first open
+      lastChampionSelectSession = championSelectRoot;
+      isFirstOpenInSession = true;
     }
     
     championLocked = locked;
