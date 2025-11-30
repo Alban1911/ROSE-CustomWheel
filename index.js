@@ -1965,7 +1965,45 @@
     }
 
     const mods = Array.isArray(detail.mods) ? detail.mods : [];
+    
+    // Check for historic mod and auto-select it
+    const historicMod = detail.historicMod;
+    if (historicMod && !selectedModId) {
+      // Find the mod that matches the historic path
+      const historicModEntry = mods.find(mod => {
+        const modPath = mod.relativePath || "";
+        // Normalize paths for comparison
+        return modPath.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
+      });
+      
+      if (historicModEntry) {
+        // Use the same ID format as updateModEntries uses
+        const modId = historicModEntry.relativePath || historicModEntry.modName || `mod-${Date.now()}-${Math.random()}`;
+        selectedModId = modId;
+        selectedModSkinId = skinId;
+      }
+    }
+    
     updateModEntries(mods);
+    
+    // After UI is updated, emit selection to backend if historic mod was found
+    if (historicMod && selectedModId) {
+      const historicModEntry = mods.find(mod => {
+        const modPath = mod.relativePath || mod.modName || "";
+        return modPath === selectedModId || mod.relativePath === selectedModId;
+      });
+      if (historicModEntry) {
+        // Find the button and update it, then emit
+        const button = panel?._modList?.querySelector(
+          `[data-mod-id="${selectedModId}"] .mod-select-button`
+        );
+        if (button) {
+          button.textContent = "Selected";
+          button.classList.add("selected");
+        }
+        emit({ type: "select-skin-mod", championId, skinId, modId: selectedModId, modData: historicModEntry });
+      }
+    }
   }
 
   function handleMapsResponse(event) {
