@@ -1979,7 +1979,46 @@
     }
 
     const mapsList = Array.isArray(detail.maps) ? detail.maps : [];
+    
+    // Check for historic mod and auto-select it
+    const historicMod = detail.historicMod;
+    if (historicMod && !selectedMapId) {
+      // Find the mod that matches the historic path
+      // historicMod is the relative path (e.g., "maps/default-summoner-rift_1.0.1")
+      // map.id is also the relative path
+      const historicMap = mapsList.find(map => {
+        const mapId = map.id || "";
+        // Normalize paths for comparison
+        return mapId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
+      });
+      
+      if (historicMap) {
+        // Use the same ID format as updateMapsEntries uses
+        const mapId = historicMap.id || historicMap.name || `map-${Date.now()}-${Math.random()}`;
+        selectedMapId = mapId;
+      }
+    }
+    
     updateMapsEntries(mapsList);
+    
+    // After UI is updated, emit selection to backend if historic mod was found
+    if (historicMod && selectedMapId) {
+      const historicMap = mapsList.find(map => {
+        const mapId = map.id || map.name || `map-${Date.now()}-${Math.random()}`;
+        return mapId === selectedMapId;
+      });
+      if (historicMap) {
+        // Find the button and update it, then emit
+        const button = panel?._mapsList?.querySelector(
+          `[data-map-id="${selectedMapId}"] .mod-select-button`
+        );
+        if (button) {
+          button.textContent = "Selected";
+          button.classList.add("selected");
+        }
+        emit({ type: "select-map", mapId: selectedMapId, mapData: historicMap });
+      }
+    }
   }
 
   function handleFontsResponse(event) {
@@ -1993,7 +2032,43 @@
     }
 
     const fontsList = Array.isArray(detail.fonts) ? detail.fonts : [];
+    
+    // Check for historic mod and auto-select it
+    const historicMod = detail.historicMod;
+    if (historicMod && !selectedFontId) {
+      // Find the mod that matches the historic path
+      const historicFont = fontsList.find(font => {
+        const fontId = font.id || "";
+        // Normalize paths for comparison
+        return fontId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
+      });
+      
+      if (historicFont) {
+        const fontId = historicFont.id || historicFont.name || `font-${Date.now()}-${Math.random()}`;
+        selectedFontId = fontId;
+      }
+    }
+    
     updateFontsEntries(fontsList);
+    
+    // After UI is updated, emit selection to backend if historic mod was found
+    if (historicMod && selectedFontId) {
+      const historicFont = fontsList.find(font => {
+        const fontId = font.id || font.name || `font-${Date.now()}-${Math.random()}`;
+        return fontId === selectedFontId;
+      });
+      if (historicFont) {
+        // Find the button and update it, then emit
+        const button = panel?._fontsList?.querySelector(
+          `[data-font-id="${selectedFontId}"] .mod-select-button`
+        );
+        if (button) {
+          button.textContent = "Selected";
+          button.classList.add("selected");
+        }
+        emit({ type: "select-font", fontId: selectedFontId, fontData: historicFont });
+      }
+    }
   }
 
   function handleAnnouncersResponse(event) {
@@ -2007,7 +2082,43 @@
     }
 
     const announcersList = Array.isArray(detail.announcers) ? detail.announcers : [];
+    
+    // Check for historic mod and auto-select it
+    const historicMod = detail.historicMod;
+    if (historicMod && !selectedAnnouncerId) {
+      // Find the mod that matches the historic path
+      const historicAnnouncer = announcersList.find(announcer => {
+        const announcerId = announcer.id || "";
+        // Normalize paths for comparison
+        return announcerId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
+      });
+      
+      if (historicAnnouncer) {
+        const announcerId = historicAnnouncer.id || historicAnnouncer.name || `announcer-${Date.now()}-${Math.random()}`;
+        selectedAnnouncerId = announcerId;
+      }
+    }
+    
     updateAnnouncersEntries(announcersList);
+    
+    // After UI is updated, emit selection to backend if historic mod was found
+    if (historicMod && selectedAnnouncerId) {
+      const historicAnnouncer = announcersList.find(announcer => {
+        const announcerId = announcer.id || announcer.name || `announcer-${Date.now()}-${Math.random()}`;
+        return announcerId === selectedAnnouncerId;
+      });
+      if (historicAnnouncer) {
+        // Find the button and update it, then emit
+        const button = panel?._announcersList?.querySelector(
+          `[data-announcer-id="${selectedAnnouncerId}"] .mod-select-button`
+        );
+        if (button) {
+          button.textContent = "Selected";
+          button.classList.add("selected");
+        }
+        emit({ type: "select-announcer", announcerId: selectedAnnouncerId, announcerData: historicAnnouncer });
+      }
+    }
   }
 
   function handleOthersResponse(event) {
@@ -2021,7 +2132,43 @@
     }
 
     const othersList = Array.isArray(detail.others) ? detail.others : [];
+    
+    // Check for historic mod and auto-select it
+    const historicMod = detail.historicMod;
+    if (historicMod && !selectedOtherId) {
+      // Find the mod that matches the historic path
+      const historicOther = othersList.find(other => {
+        const otherId = other.id || "";
+        // Normalize paths for comparison
+        return otherId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
+      });
+      
+      if (historicOther) {
+        const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
+        selectedOtherId = otherId;
+      }
+    }
+    
     updateOthersEntries(othersList);
+    
+    // After UI is updated, emit selection to backend if historic mod was found
+    if (historicMod && selectedOtherId) {
+      const historicOther = othersList.find(other => {
+        const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
+        return otherId === selectedOtherId;
+      });
+      if (historicOther) {
+        // Find the button and update it, then emit
+        const button = panel?._othersList?.querySelector(
+          `[data-other-id="${selectedOtherId}"] .mod-select-button`
+        );
+        if (button) {
+          button.textContent = "Selected";
+          button.classList.add("selected");
+        }
+        emit({ type: "select-other", otherId: selectedOtherId, otherData: historicOther });
+      }
+    }
   }
 
   function handleChampionLocked(event) {
