@@ -983,17 +983,16 @@
       }
     }
 
-    const buttonCenterX = rect.left + rect.width / 2;
-    const flyoutLeft = buttonCenterX - flyoutRect.width / 2;
+    // Align panel's right edge with button's right edge (since button is at bottom right)
+    const buttonRight = rect.right;
+    const flyoutRight = window.innerWidth - buttonRight;
     const flyoutTop = rect.top - flyoutRect.height - 15;
 
     flyoutFrame.style.position = "absolute";
     flyoutFrame.style.overflow = "visible";
     flyoutFrame.style.top = `${Math.max(10, flyoutTop)}px`;
-    flyoutFrame.style.left = `${Math.max(
-      10,
-      Math.min(flyoutLeft, window.innerWidth - flyoutRect.width - 10)
-    )}px`;
+    flyoutFrame.style.right = `${flyoutRight}px`;
+    flyoutFrame.style.left = ""; // Clear left when using right
 
     panelElement.style.position = "fixed";
     panelElement.style.top = "0";
@@ -1107,13 +1106,34 @@
       // Select button
       const selectButton = document.createElement("button");
       selectButton.className = "mod-select-button";
-      // Restore selection if this mod was previously selected for the current skin
-      const isSelected = (selectedModId === modId || previousSelectedModId === modId) && 
-                         selectedModSkinId === currentSkinData?.skinId;
-      if (isSelected && previousSelectedModId === modId) {
-        selectedModId = modId; // Restore the selection
-        selectedModSkinId = currentSkinData?.skinId; // Restore the skin ID
+      // Check if this mod is selected for the current skin
+      // updateModEntries is always called with mods for the current skin
+      const currentSkinId = currentSkinData?.skinId;
+      const modIdMatches = (selectedModId === modId || previousSelectedModId === modId);
+      
+      // Check if skin matches (handle both Number and string comparisons)
+      let skinMatches = false;
+      if (currentSkinId !== undefined && selectedModSkinId !== null && selectedModSkinId !== undefined) {
+        const currentSkinIdNum = Number(currentSkinId);
+        const selectedSkinIdNum = Number(selectedModSkinId);
+        skinMatches = currentSkinIdNum === selectedSkinIdNum;
+      } else if (previousSelectedModId === modId && currentSkinId !== undefined) {
+        // If this was previously selected and we have current skin data, assume it matches
+        skinMatches = true;
       }
+      
+      const isSelected = modIdMatches && (skinMatches || (previousSelectedModId === modId && currentSkinId !== undefined));
+      
+      // Restore selection state if this was previously selected for current skin
+      if (previousSelectedModId === modId && selectedModId !== modId && currentSkinId !== undefined) {
+        selectedModId = modId;
+        selectedModSkinId = Number(currentSkinId);
+      }
+      // Ensure selectedModSkinId is set correctly if mod is selected but skin ID is missing
+      if (selectedModId === modId && currentSkinId !== undefined && (selectedModSkinId === null || selectedModSkinId === undefined)) {
+        selectedModSkinId = Number(currentSkinId);
+      }
+      
       selectButton.textContent = isSelected ? "Selected" : "Select";
       if (isSelected) {
         selectButton.classList.add("selected");
