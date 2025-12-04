@@ -1528,27 +1528,30 @@
       button.parentNode.removeChild(button);
     }
 
-    // Position the button above the container using fixed positioning
-    const rect = targetContainer.getBoundingClientRect();
-    const spacing = 10; // 10px spacing above the buttons
-    
-    button.style.position = "fixed";
-    button.style.right = `${window.innerWidth - rect.right}px`; // Align with right edge of container
-    button.style.bottom = `${window.innerHeight - rect.top + spacing}px`; // Position above with spacing
+    // Ensure container has relative positioning for absolute child
+    const containerStyles = window.getComputedStyle(targetContainer);
+    if (containerStyles.position === "static") {
+      targetContainer.style.position = "relative";
+    }
+
+    // Position button absolutely above the container buttons
+    button.style.position = "absolute";
+    button.style.right = "0"; // Align with right edge of container
+    button.style.bottom = "100%"; // Position above container
+    button.style.marginBottom = "10px"; // 10px spacing above buttons
     button.style.left = "";
     button.style.top = "";
     button.style.width = "auto";
     button.style.height = "auto";
-    button.style.margin = "0";
     button.style.padding = "";
     button.style.display = "block";
     button.style.visibility = "visible";
     button.style.opacity = "1";
-    button.style.zIndex = "1000";
+    button.style.zIndex = "";
     button.style.transform = "";
 
-    // Append to body for fixed positioning
-    document.body.appendChild(button);
+    // Append to container (same structure as QUIT button)
+    targetContainer.appendChild(button);
 
     // Store reference to container for repositioning
     button._container = targetContainer;
@@ -2187,16 +2190,9 @@
     });
     // Reposition button when skin changes
     const repositionButton = () => {
-      // Recalculate position above the container
-      if (button && button._container && championLocked) {
-        const targetContainer = button._container;
-        const rect = targetContainer.getBoundingClientRect();
-        const spacing = 10; // 10px spacing above the buttons
-        
-        button.style.right = `${window.innerWidth - rect.right}px`; // Align with right edge of container
-        button.style.bottom = `${window.innerHeight - rect.top + spacing}px`; // Position above with spacing
-      } else if (button && !button.parentNode && championLocked) {
-        // If button is not attached, try to attach it
+      // Button is now part of container flow, so no manual repositioning needed
+      // Just check if button needs to be reattached
+      if (button && !button.parentNode && championLocked) {
         attachToChampionSelect();
       }
       // Reposition panel if it's open
