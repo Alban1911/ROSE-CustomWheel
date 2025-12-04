@@ -152,26 +152,7 @@
     bridgeSocket.addEventListener("message", (event) => {
       try {
         const payload = JSON.parse(event.data);
-        if (payload.type === "local-asset-url") {
-          // Handle asset URL response - update button images
-          const { assetPath, url } = payload;
-          if (button) {
-            const defaultImg = button.querySelector(".button-image.default");
-            const pressedImg = button.querySelector(".button-image.pressed");
-            
-            if (assetPath === "tftm_promotebutton_default.png" && defaultImg && url) {
-              defaultImg.style.backgroundImage = `url('${url}')`;
-              defaultImg.style.backgroundSize = "contain";
-              defaultImg.style.backgroundPosition = "center";
-              defaultImg.style.backgroundRepeat = "no-repeat";
-            } else if (assetPath === "tftm_promotebutton_pressed.png" && pressedImg && url) {
-              pressedImg.style.backgroundImage = `url('${url}')`;
-              pressedImg.style.backgroundSize = "contain";
-              pressedImg.style.backgroundPosition = "center";
-              pressedImg.style.backgroundRepeat = "no-repeat";
-            }
-          }
-        }
+        // Button no longer uses images - handled by League UI component
       } catch (e) {
         // Ignore parse errors
       }
@@ -274,6 +255,12 @@
       z-index: 1;
       margin: 0;
       padding: 0;
+    }
+
+    lol-uikit-flat-button.rose-custom-wheel-button,
+    .rose-custom-wheel-button {
+      display: inline-block !important;
+      white-space: nowrap !important;
     }
 
     .${BUTTON_CLASS}[data-hidden],
@@ -588,41 +575,13 @@
       return button;
     }
 
-    button = document.createElement("div");
-    button.className = BUTTON_CLASS;
-    
-    // Create image elements for default and pressed states
-    const defaultImg = document.createElement("div");
-    defaultImg.className = "button-image default";
-    // Don't set background image yet - wait for HTTP URL from Python
-    
-    const pressedImg = document.createElement("div");
-    pressedImg.className = "button-image pressed";
-    // Don't set background image yet - wait for HTTP URL from Python
-    
-    button.appendChild(defaultImg);
-    button.appendChild(pressedImg);
-
-    // Request button images from Python backend
-    if (bridgeReady) {
-      emit({
-        type: "request-local-asset",
-        assetPath: "tftm_promotebutton_default.png",
-      });
-      emit({
-        type: "request-local-asset",
-        assetPath: "tftm_promotebutton_pressed.png",
-      });
-    } else {
-      bridgeQueue.push(JSON.stringify({
-        type: "request-local-asset",
-        assetPath: "tftm_promotebutton_default.png",
-      }));
-      bridgeQueue.push(JSON.stringify({
-        type: "request-local-asset",
-        assetPath: "tftm_promotebutton_pressed.png",
-      }));
+    try {
+      button = document.createElement("lol-uikit-flat-button");
+    } catch (e) {
+      button = document.createElement("div");
     }
+    button.className = "lol-uikit-flat-button idle rose-custom-wheel-button";
+    button.textContent = "Custom mods";
 
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -689,28 +648,28 @@
     tabContainer.className = "tab-container";
 
     // Create tabs using League UI components
-    const modsTab = document.createElement("lol-uikit-flat-button-secondary");
-    modsTab.className = "tab-button active";
+    const modsTab = document.createElement("lol-uikit-flat-button");
+    modsTab.className = "lol-uikit-flat-button idle tab-button active";
     modsTab.textContent = "Skins";
     modsTab.dataset.tab = "skins";
     
-    const mapsTab = document.createElement("lol-uikit-flat-button-secondary");
-    mapsTab.className = "tab-button";
+    const mapsTab = document.createElement("lol-uikit-flat-button");
+    mapsTab.className = "lol-uikit-flat-button idle tab-button";
     mapsTab.textContent = "Maps";
     mapsTab.dataset.tab = "maps";
     
-    const fontsTab = document.createElement("lol-uikit-flat-button-secondary");
-    fontsTab.className = "tab-button";
+    const fontsTab = document.createElement("lol-uikit-flat-button");
+    fontsTab.className = "lol-uikit-flat-button idle tab-button";
     fontsTab.textContent = "Fonts";
     fontsTab.dataset.tab = "fonts";
     
-    const announcersTab = document.createElement("lol-uikit-flat-button-secondary");
-    announcersTab.className = "tab-button";
+    const announcersTab = document.createElement("lol-uikit-flat-button");
+    announcersTab.className = "lol-uikit-flat-button idle tab-button";
     announcersTab.textContent = "Announcers";
     announcersTab.dataset.tab = "announcers";
     
-    const othersTab = document.createElement("lol-uikit-flat-button-secondary");
-    othersTab.className = "tab-button";
+    const othersTab = document.createElement("lol-uikit-flat-button");
+    othersTab.className = "lol-uikit-flat-button idle tab-button";
     othersTab.textContent = "Others";
     othersTab.dataset.tab = "others";
 
@@ -1518,59 +1477,8 @@
   }
 
   function findButtonContainer() {
-    // Find the same container that RandomSkin uses
-    const carouselContainer = document.querySelector(".skin-selection-carousel-container");
-    if (carouselContainer) {
-      return carouselContainer;
-    }
-    
-    const carousel = document.querySelector(".skin-selection-carousel");
-    if (carousel) {
-      return carousel;
-    }
-    
-    const mainContainer = document.querySelector(".champion-select-main-container");
-    if (mainContainer) {
-      const visibleDiv = mainContainer.querySelector("div.visible");
-      if (visibleDiv) {
-        return visibleDiv;
-      }
-    }
-    
-    return null;
-  }
-
-  function findButtonLocation() {
-    // Position button to the right of where random button would be (centered below skin, but to the right)
-    const allItems = document.querySelectorAll(".skin-selection-item");
-    for (const item of allItems) {
-      if (item.classList.contains("skin-carousel-offset-2")) {
-        const rect = item.getBoundingClientRect();
-        // Position to the right of where random button would be (centered + 38px + 8px spacing)
-        // Same Y level as random button (78px below skin item)
-        return {
-          x: rect.left + rect.width / 2 + 19 + 8, // Half width + random button width + spacing
-          y: rect.top + 28, // Moved up to be above VIEW ABILITIES bar
-          width: 25,
-          height: 25,
-          relativeTo: item
-        };
-      }
-    }
-
-    const selectedItem = document.querySelector(".skin-selection-item.skin-selection-item-selected");
-    if (selectedItem) {
-      const rect = selectedItem.getBoundingClientRect();
-      return {
-        x: rect.left + rect.width / 2 + 19 + 8,
-        y: rect.top + 28, // Moved up to be above VIEW ABILITIES bar
-        width: 25,
-        height: 25,
-        relativeTo: selectedItem
-      };
-    }
-
-    return null;
+    // Find the bottom-right-buttons container to position the button above it
+    return document.querySelector(".bottom-right-buttons");
   }
 
   function attachToChampionSelect() {
@@ -1580,20 +1488,6 @@
 
     createButton();
     createPanel();
-
-    const location = findButtonLocation();
-    if (!location) {
-      // Retry after a short delay if location not found (DOM might not be ready)
-      setTimeout(() => {
-        if (championLocked && championSelectRoot) {
-          const retryLocation = findButtonLocation();
-          if (retryLocation) {
-            attachToChampionSelect();
-          }
-        }
-      }, 100);
-      return;
-    }
 
     const targetContainer = findButtonContainer();
     if (!targetContainer) {
@@ -1614,43 +1508,29 @@
       button.parentNode.removeChild(button);
     }
 
-    // Get container's position relative to viewport for absolute positioning
-    const containerRect = targetContainer.getBoundingClientRect();
-
-    // Ensure container has positioning context for absolute children
-    const containerComputedStyle = window.getComputedStyle(targetContainer);
-    if (containerComputedStyle.position === 'static') {
-      targetContainer.style.position = 'relative';
-    }
-
-    // Calculate position relative to container
-    const left = location.x - containerRect.left;
-    const top = location.y - containerRect.top;
-
-    // Position button absolutely within container - use setProperty to ensure it applies
-    button.style.setProperty('position', 'absolute', 'important');
-    button.style.setProperty('left', `${left}px`, 'important');
-    button.style.setProperty('top', `${top}px`, 'important');
-    button.style.setProperty('width', `${location.width}px`, 'important');
-    button.style.setProperty('height', `${location.height}px`, 'important');
-    button.style.zIndex = "1"; // Above random button (which is z-index 0)
+    // Position the button above the container using fixed positioning
+    const rect = targetContainer.getBoundingClientRect();
+    const spacing = 10; // 10px spacing above the buttons
+    
+    button.style.position = "fixed";
+    button.style.right = `${window.innerWidth - rect.right}px`; // Align with right edge of container
+    button.style.bottom = `${window.innerHeight - rect.top + spacing}px`; // Position above with spacing
+    button.style.left = "";
+    button.style.top = "";
+    button.style.width = "auto";
+    button.style.height = "auto";
+    button.style.margin = "0";
+    button.style.padding = "";
     button.style.display = "block";
     button.style.visibility = "visible";
     button.style.opacity = "1";
-
-    // Remove the default positioning classes that might interfere
-    button.style.bottom = "";
+    button.style.zIndex = "1000";
     button.style.transform = "";
-    button.style.margin = "0";
-    button.style.padding = "0";
 
-    targetContainer.appendChild(button);
-    
-    // Force browser to apply the position (after appending to DOM)
-    void button.offsetHeight; // Trigger reflow
+    // Append to body for fixed positioning
+    document.body.appendChild(button);
 
-    // Store references for repositioning
-    button._relativeTo = location.relativeTo;
+    // Store reference to container for repositioning
     button._container = targetContainer;
 
     if (panel.parentNode !== document.body) {
@@ -2287,18 +2167,19 @@
     });
     // Reposition button when skin changes
     const repositionButton = () => {
-      if (button && button.parentNode && championLocked) {
-        const location = findButtonLocation();
-        if (location && button._container) {
-          const containerRect = button._container.getBoundingClientRect();
-          const newLeft = location.x - containerRect.left;
-          const newTop = location.y - containerRect.top;
-          button.style.setProperty('left', `${newLeft}px`, 'important');
-          button.style.setProperty('top', `${newTop}px`, 'important');
-          // Force browser to apply the position
-          void button.offsetHeight; // Trigger reflow
-        }
+      // Recalculate position above the container
+      if (button && button._container && championLocked) {
+        const targetContainer = button._container;
+        const rect = targetContainer.getBoundingClientRect();
+        const spacing = 10; // 10px spacing above the buttons
+        
+        button.style.right = `${window.innerWidth - rect.right}px`; // Align with right edge of container
+        button.style.bottom = `${window.innerHeight - rect.top + spacing}px`; // Position above with spacing
+      } else if (button && !button.parentNode && championLocked) {
+        // If button is not attached, try to attach it
+        attachToChampionSelect();
       }
+      // Reposition panel if it's open
       if (isOpen && panel && button) {
         positionPanel(panel, button);
       }
