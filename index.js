@@ -263,26 +263,32 @@
       white-space: nowrap !important;
     }
 
-    .rose-custom-wheel-button .count-badge.social-count-badge {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      min-width: 18px;
-      height: 18px;
-      padding: 0 5px;
-      background: #c89b3c;
-      color: #000;
-      border-radius: 3px;
-      font-size: 11px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      box-sizing: border-box;
-      pointer-events: none;
-      z-index: 10;
-      transform: translate(0, 0);
+    .rose-custom-wheel-button .count-badge.social-count-badge,
+    lol-uikit-flat-button.rose-custom-wheel-button .count-badge.social-count-badge,
+    .rose-custom-wheel-button > .count-badge.social-count-badge,
+    lol-uikit-flat-button.rose-custom-wheel-button > .count-badge.social-count-badge {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      min-width: 18px !important;
+      height: 18px !important;
+      padding: 0 5px !important;
+      background: #c89b3c !important;
+      color: #000 !important;
+      border-radius: 3px !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      box-sizing: border-box !important;
+      pointer-events: none !important;
+      z-index: 10 !important;
+      transform: translate(-170%, -70%) !important;
+      margin: 0 !important;
+      right: auto !important;
+      bottom: auto !important;
     }
 
     .${BUTTON_CLASS}[data-hidden],
@@ -622,6 +628,10 @@
     countBadge.className = "count-badge social-count-badge";
     countBadge.textContent = "0";
     countBadge.style.display = "none"; // Hidden by default
+    countBadge.style.position = "absolute";
+    countBadge.style.top = "0";
+    countBadge.style.left = "0";
+    countBadge.style.transform = "translate(-70%, -50%)";
     button.appendChild(countBadge);
     button._countBadge = countBadge; // Store reference
 
@@ -1612,12 +1622,26 @@
     button.style.opacity = "1";
     button.style.zIndex = "";
     button.style.transform = "";
+    
+    // Ensure badge positioning works - button needs to be relative for badge absolute positioning
+    // But we need absolute for button positioning, so we'll use a wrapper or ensure badge uses button as reference
+    // Actually, absolute children can still position relative to absolute parents, so this should work
 
     // Append to container (same structure as QUIT button)
     targetContainer.appendChild(button);
 
     // Store reference to container for repositioning
     button._container = targetContainer;
+    
+    // Force badge positioning after button is attached
+    if (button._countBadge) {
+      const badge = button._countBadge;
+      badge.style.position = "absolute";
+      badge.style.top = "0";
+      badge.style.left = "0";
+      badge.style.transform = "translate(-170%, -70%)";
+      badge.style.zIndex = "10";
+    }
 
     if (panel.parentNode !== document.body) {
       document.body.appendChild(panel);
@@ -1842,11 +1866,20 @@
     // If same skin, keep the selection
 
     if (!championId || !skinId) {
+      // Reset badge when no skin is hovered
+      updateButtonBadge(0);
       if (panel && panel._modsLoading) {
         panel._modsLoading.textContent = "Hover a skin...";
         panel._modsLoading.style.display = "block";
       }
       return;
+    }
+
+    // Reset badge immediately when requesting mods for a new skin
+    // This ensures the badge doesn't show stale data while waiting for response
+    const previousSkinId = currentSkinData?.skinId;
+    if (previousSkinId !== undefined && previousSkinId !== skinId) {
+      updateButtonBadge(0);
     }
 
     emit({ type: REQUEST_TYPE, championId, skinId });
@@ -1911,10 +1944,18 @@
       return;
     }
     const badge = button._countBadge;
+    // Ensure badge positioning is always correct
+    badge.style.position = "absolute";
+    badge.style.top = "0";
+    badge.style.left = "0";
+    badge.style.transform = "translate(-170%, -70%)";
+    badge.style.zIndex = "10";
+    
     if (count > 0) {
       badge.textContent = String(count);
-      badge.style.display = "";
+      badge.style.display = "flex"; // Explicitly set to flex to match CSS
     } else {
+      badge.textContent = "0"; // Reset text content
       badge.style.display = "none";
     }
   }
