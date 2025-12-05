@@ -1843,18 +1843,46 @@
     selectedOtherId = null;
   }
 
-  function requestModsForCurrentSkin() {
-    const state = window.__roseSkinState || {};
-    const championId = Number(state.championId);
-    const skinId = Number(state.skinId);
+  // Cache to map Skin Name -> Base Skin ID
+  // This helps recover the correct ID when a chroma is selected (which reports a different ID)
+  const skinIdCache = {};
 
-    // Only reset selection if skin actually changed
+  function requestModsForCurrentSkin(championIdParam, skinIdParam) {
+    let championId = championIdParam;
+    let skinId = skinIdParam;
+
+    if (!championId || !skinId) {
+      const state = window.__roseSkinState || {};
+      championId = Number(state.championId);
+      skinId = Number(state.skinId);
+    }
+
+    // Ensure numbers
+    championId = Number(championId);
+    skinId = Number(skinId);
+
+    // Only reset selection if skin actually changed AND we have a valid new skin
+    // If we receive a "nothing hovered" event (0/0), we might not want to clear selection immediately 
+    // depending on UX, but usually we do. 
+    // Let's stick to logic: if skinId changes to something else, reset selection.
+
+    // Store current skin data so we know what is currently hovered
+    if (championId && skinId) {
+      currentSkinData = { championId, skinId };
+    }
+
     if (selectedModId && selectedModSkinId !== skinId) {
       // Skin changed, reset selection
       selectedModId = null;
       selectedModSkinId = null;
     }
     // If same skin, keep the selection
+
+    // Always clear the list immediately when requesting
+    // This prevents stale state from persisting (e.g. if backend fails/timeouts on a chroma ID)
+    if (panel && panel._modList) {
+      panel._modList.innerHTML = "";
+    }
 
     if (!championId || !skinId) {
       // Reset badge when no skin is hovered
@@ -1868,10 +1896,12 @@
 
     // Reset badge immediately when requesting mods for a new skin
     // This ensures the badge doesn't show stale data while waiting for response
+    // Logic: if the requested skin is different from what we thought was current, reset badge.
     const previousSkinId = currentSkinData?.skinId;
-    if (previousSkinId !== undefined && previousSkinId !== skinId) {
-      updateButtonBadge(0);
-    }
+    // Note: currentSkinData might have been just updated above, so this check is a bit redundant if we updated it.
+    // But safely: if we are requesting new data, we should probably show loading state.
+
+    updateButtonBadge(0);
 
     emit({ type: REQUEST_TYPE, championId, skinId });
 
@@ -1922,8 +1952,36 @@
   }
 
   function handleSkinState(event) {
-    // Always request mods to update badge, even if panel is not open
-    requestModsForCurrentSkin();
+    const detail = event?.detail;
+    let skinId = detail?.skinId;
+    const skinName = detail?.name;
+
+    // Intelligent caching to handle Chroma IDs
+    // If we have seen this skin name before with a different ID,
+    // we should prioritize the 'smaller' ID (usually Base Skin) to ensure we find mods.
+    if (skinName && skinId) {
+      const cachedId = skinIdCache[skinName];
+      if (cachedId) {
+        // If cached ID exists and is different from current ID
+        if (cachedId !== skinId) {
+          console.log(`[ROSE-CustomWheel] Skin ID mismatch for ${skinName}: Current ${skinId}, Cached ${cachedId}. Using cached (Base) ID.`);
+          // Assume the cached one (seen earlier) is the Base ID. 
+          // (Using the smaller ID is a safe heuristic for Skin vs Chroma relation usually)
+          if (cachedId < skinId) {
+            skinId = cachedId;
+          } else {
+            // If current is smaller, maybe we saw chroma first? Update cache to smaller.
+            skinIdCache[skinName] = skinId;
+          }
+        }
+      } else {
+        // New skin, cache it
+        skinIdCache[skinName] = skinId;
+      }
+    }
+
+    // Always request mods to update badge using the exact event data
+    requestModsForCurrentSkin(detail?.championId, skinId);
 
     if (!isOpen) {
       return;
