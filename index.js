@@ -6,6 +6,7 @@
  */
 (function createCustomWheel() {
   const LOG_PREFIX = "[ROSE-CustomWheel]";
+  console.log(`${LOG_PREFIX} JS Loaded`);
   const BUTTON_CLASS = "lu-chroma-button";
   const BUTTON_SELECTOR = `.${BUTTON_CLASS}`;
   const PANEL_CLASS = "lu-chroma-panel";
@@ -35,7 +36,7 @@
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
-  let BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+  let BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
   const BRIDGE_PORT_STORAGE_KEY = "rose_bridge_port";
   const DISCOVERY_START_PORT = 50000;
   const DISCOVERY_END_PORT = 50010;
@@ -51,7 +52,7 @@
         const port = parseInt(cachedPort, 10);
         if (!isNaN(port) && port > 0) {
           try {
-            const response = await fetch(`http://localhost:${port}/bridge-port`, {
+            const response = await fetch(`http://127.0.0.1:${port}/bridge-port`, {
               signal: AbortSignal.timeout(200),
             });
             if (response.ok) {
@@ -59,7 +60,7 @@
               const fetchedPort = parseInt(portText.trim(), 10);
               if (!isNaN(fetchedPort) && fetchedPort > 0) {
                 BRIDGE_PORT = fetchedPort;
-                BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+                BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
                 return true;
               }
             }
@@ -71,7 +72,7 @@
 
       // OPTIMIZATION: Try default port 50000 FIRST before scanning all ports
       try {
-        const response = await fetch(`http://localhost:50000/bridge-port`, {
+        const response = await fetch(`http://127.0.0.1:50000/bridge-port`, {
           signal: AbortSignal.timeout(200),
         });
         if (response.ok) {
@@ -79,7 +80,7 @@
           const fetchedPort = parseInt(portText.trim(), 10);
           if (!isNaN(fetchedPort) && fetchedPort > 0) {
             BRIDGE_PORT = fetchedPort;
-            BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+            BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
             localStorage.setItem(BRIDGE_PORT_STORAGE_KEY, String(BRIDGE_PORT));
             return true;
           }
@@ -88,12 +89,31 @@
         // Port 50000 not ready, continue to discovery
       }
 
+      // OPTIMIZATION: Try fallback port 50001 SECOND
+      try {
+        const response = await fetch(`http://127.0.0.1:50001/bridge-port`, {
+          signal: AbortSignal.timeout(200),
+        });
+        if (response.ok) {
+          const portText = await response.text();
+          const fetchedPort = parseInt(portText.trim(), 10);
+          if (!isNaN(fetchedPort) && fetchedPort > 0) {
+            BRIDGE_PORT = fetchedPort;
+            BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
+            localStorage.setItem(BRIDGE_PORT_STORAGE_KEY, String(BRIDGE_PORT));
+            return true;
+          }
+        }
+      } catch (e) {
+        // Port 50001 not ready, continue to discovery
+      }
+
       // OPTIMIZATION: Parallel port discovery instead of sequential
       const portPromises = [];
       for (let port = DISCOVERY_START_PORT; port <= DISCOVERY_END_PORT; port++) {
         portPromises.push(
-          fetch(`http://localhost:${port}/bridge-port`, {
-            signal: AbortSignal.timeout(300),
+          fetch(`http://127.0.0.1:${port}/bridge-port`, {
+            signal: AbortSignal.timeout(1000),
           })
             .then((response) => {
               if (response.ok) {
@@ -116,7 +136,7 @@
       for (const result of results) {
         if (result.status === "fulfilled" && result.value) {
           BRIDGE_PORT = result.value.port;
-          BRIDGE_URL = `ws://localhost:${BRIDGE_PORT}`;
+          BRIDGE_URL = `ws://127.0.0.1:${BRIDGE_PORT}`;
           localStorage.setItem(BRIDGE_PORT_STORAGE_KEY, String(BRIDGE_PORT));
           return true;
         }
