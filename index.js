@@ -257,6 +257,7 @@
       padding: 0;
     }
 
+    /* Button and Badge Styles */
     lol-uikit-flat-button.rose-custom-wheel-button,
     .rose-custom-wheel-button {
       display: inline-block !important;
@@ -324,34 +325,20 @@
       border-radius: 2px;
     }
 
-    .${BUTTON_CLASS} .button-image.default {
-      opacity: 1;
-    }
+    .${BUTTON_CLASS} .button-image.default { opacity: 1; }
+    .${BUTTON_CLASS} .button-image.pressed { opacity: 0; background-color: transparent !important; border: none !important; }
+    .${BUTTON_CLASS}.pressed .button-image.default { opacity: 0; }
+    .${BUTTON_CLASS}.pressed .button-image.pressed { opacity: 1; }
 
-    .${BUTTON_CLASS} .button-image.pressed {
-      opacity: 0;
-      background-color: transparent !important;
-      border: none !important;
-    }
+    .chroma.icon { display: none !important; }
 
-    .${BUTTON_CLASS}.pressed .button-image.default {
-      opacity: 0;
-    }
-
-    .${BUTTON_CLASS}.pressed .button-image.pressed {
-      opacity: 1;
-    }
-
-
-    .chroma.icon {
-      display: none !important;
-    }
-
+    /* Main Panel Container */
     .${PANEL_CLASS} {
       position: fixed;
       z-index: 10000;
       pointer-events: all;
       -webkit-user-select: none;
+      font-family: "Spiegel", "LoL Body", Arial, sans-serif;
     }
 
     .${PANEL_CLASS}[data-no-button] {
@@ -359,47 +346,39 @@
       cursor: default !important;
     }
 
-    .${PANEL_CLASS}[data-no-button] * {
-      pointer-events: none !important;
-      cursor: default !important;
-    }
-
+    /* Modal Content */
     .${PANEL_CLASS} .chroma-modal {
-      background: #000;
+      background: #010a13;
+      border-radius: 2px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
       display: flex;
       flex-direction: column;
       width: auto;
+      min-width: 320px;
       position: relative;
       z-index: 0;
       padding: 16px;
       box-sizing: border-box;
       overflow: hidden;
+      color: #f0e6d2;
+      height: 400px !important;
+      min-height: 400px !important;
+      max-height: 400px !important;
     }
     
     .${PANEL_CLASS} .chroma-modal.chroma-view {
-      height: 400px !important;
-      max-height: 400px !important;
-      min-height: 400px !important;
+      /* Height handled in base class to ensure consistency */
       overflow: hidden;
     }
-    
+
+    /* Flyout Reset */
     .${PANEL_CLASS} .flyout {
       position: absolute;
       overflow: visible;
       pointer-events: all;
       -webkit-user-select: none;
       width: auto !important;
-    }
-
-    .${PANEL_CLASS}[data-no-button] .flyout {
-      pointer-events: none !important;
-      cursor: default !important;
-    }
-    
-    .${PANEL_CLASS} .flyout-frame {
-      position: relative;
-      transition: 250ms all cubic-bezier(0.02, 0.85, 0.08, 0.99);
-      width: auto !important;
+      filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
     }
     
     .${PANEL_CLASS} .flyout .caret,
@@ -417,32 +396,89 @@
       content: none !important;
     }
 
-    
-    .${PANEL_CLASS} .lc-flyout-content {
-      position: relative;
-      width: auto;
+    /* Tab Navigation */
+    .${PANEL_CLASS} .tab-container {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #3c3c41;
+      padding-top: 0;
+      padding-bottom: 16px;
+      width: 100%;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
     }
 
-    .${PANEL_CLASS} .mod-selection {
-      pointer-events: all;
-      flex: 1 1 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      transform: translateZ(0);
-      -webkit-mask-box-image-source: url("/fe/lol-static-assets/images/uikit/scrollable/scrollable-content-gradient-mask-bottom.png");
-      -webkit-mask-box-image-slice: 0 8 18 0 fill;
+    .${PANEL_CLASS} .tab-button {
+      background: transparent;
+      border: none;
+      color: #a09b8c;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.2s ease;
+      position: relative;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .${PANEL_CLASS} .tab-button:hover {
+      color: #f0e6d2;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .${PANEL_CLASS} .tab-button.active {
+      color: #f0e6d2;
+    }
+
+    .${PANEL_CLASS} .tab-button.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: #c8aa6e;
+      box-shadow: 0 0 8px #c8aa6e;
+    }
+
+    .${PANEL_CLASS} .tab-content {
+      display: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    .${PANEL_CLASS} .tab-content.active {
       display: flex;
       flex-direction: column;
-      width: 100%;
-      position: relative;
-      z-index: 1;
-      min-height: 0;
-      max-height: 100%;
+      height: 100%;
     }
 
-    .${PANEL_CLASS}[data-no-button] .mod-selection {
-      pointer-events: none;
-      cursor: default;
+    /* Mod List Content */
+    .${PANEL_CLASS} .mod-selection {
+      pointer-events: all;
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+      margin-top: 4px;
+    }
+
+    /* Scrollbar */
+    .${PANEL_CLASS} .mod-selection::-webkit-scrollbar {
+      width: 6px;
+    }
+    .${PANEL_CLASS} .mod-selection::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.3);
+    }
+    .${PANEL_CLASS} .mod-selection::-webkit-scrollbar-thumb {
+      background: #5b5a56;
+      border-radius: 3px;
     }
 
     .${PANEL_CLASS} .mod-selection ul {
@@ -451,30 +487,27 @@
       padding: 0;
       display: flex;
       flex-direction: column;
-      width: 100%;
-      min-width: 0;
       gap: 6px;
     }
 
+    /* List Items */
     .${PANEL_CLASS} .mod-selection li {
-      list-style: none;
-      margin: 0;
-      padding: 8px 12px;
+      background: linear-gradient(to right, rgba(30, 35, 40, 0.9), rgba(30, 35, 40, 0.6));
+      border: 1px solid #3c3c41;
+      border-left: 3px solid transparent;
+      padding: 10px;
+      transition: all 0.2s ease;
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      transition: background 0.15s ease, border-color 0.15s ease;
-      width: 100%;
-      min-width: 0;
-      box-sizing: border-box;
+      gap: 4px;
+      border-radius: 0;
     }
 
     .${PANEL_CLASS} .mod-selection li:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(200, 155, 60, 0.3);
+      background: linear-gradient(to right, rgba(40, 45, 50, 0.9), rgba(40, 45, 50, 0.7));
+      border-color: #5c5c61;
+      border-left-color: #c8aa6e;
+      transform: translateX(2px);
     }
 
     .${PANEL_CLASS} .mod-name-row {
@@ -483,113 +516,68 @@
       justify-content: space-between;
       gap: 12px;
       width: 100%;
-      min-width: 0;
     }
     
     .${PANEL_CLASS} .mod-name {
-      color: #f7f0de;
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+      color: #f0e6d2;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.5px;
       flex: 1;
-      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .${PANEL_CLASS} .mod-description {
-      color: rgba(247, 240, 222, 0.7);
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+      color: #a09b8c;
       font-size: 11px;
       font-weight: 400;
+      line-height: 1.4;
       word-wrap: break-word;
-      overflow-wrap: break-word;
-      max-width: 100%;
     }
 
-    .${PANEL_CLASS} .mod-meta {
-      color: rgba(247, 240, 222, 0.5);
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+    .${PANEL_CLASS} .mod-meta, 
+    .${PANEL_CLASS} .mod-injection-note {
+      color: #7a7a7d;
       font-size: 10px;
-      font-weight: 400;
       font-style: italic;
     }
 
     .${PANEL_CLASS} .mod-loading {
-      color: rgba(247, 240, 222, 0.6);
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+      color: #a09b8c;
       font-size: 12px;
       text-align: center;
-      padding: 10px;
+      padding: 20px;
+      font-style: italic;
     }
 
+    /* Action Buttons */
     .${PANEL_CLASS} .mod-select-button {
-      background: rgba(200, 155, 60, 0.2);
-      border: 1px solid rgba(200, 155, 60, 0.5);
-      border-radius: 4px;
-      padding: 4px 12px;
-      color: #c89b3c;
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
+      background: transparent;
+      border: 1px solid #c8aa6e;
+      color: #c8aa6e;
+      padding: 4px 10px;
       font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.2s;
       flex-shrink: 0;
+      border-radius: 0;
     }
 
     .${PANEL_CLASS} .mod-select-button:hover {
-      background: rgba(200, 155, 60, 0.3);
-      border-color: #c89b3c;
+      background: rgba(200, 170, 110, 0.1);
+      box-shadow: 0 0 8px rgba(200, 170, 110, 0.2);
     }
 
     .${PANEL_CLASS} .mod-select-button.selected {
-      background: rgba(200, 155, 60, 0.4);
-      border-color: #c89b3c;
-      color: #f0e6d2;
+      background: #c8aa6e;
+      color: #010a13;
+      box-shadow: 0 0 10px rgba(200, 170, 110, 0.4);
+      border-color: #c8aa6e;
     }
-
-    .${PANEL_CLASS} .mod-injection-note {
-      color: rgba(247, 240, 222, 0.5);
-      font-family: "LoL Body", Arial, "Helvetica Neue", Helvetica, sans-serif;
-      font-size: 10px;
-      font-style: italic;
-      margin-top: 8px;
-      padding: 8px;
-      background: rgba(255, 255, 255, 0.02);
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .${PANEL_CLASS} .tab-container {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      padding-bottom: 8px;
-      width: fit-content;
-      flex-wrap: nowrap;
-      flex-shrink: 0;
-    }
-
-    .${PANEL_CLASS} .tab-button {
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .${PANEL_CLASS} .tab-content {
-      display: none;
-      width: 100%;
-      min-width: 0;
-    }
-
-    .${PANEL_CLASS} .tab-content.active {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-      min-width: 0;
-    }
-
   `;
 
   function injectCSS() {
@@ -616,7 +604,7 @@
     }
     button.className = "lol-uikit-flat-button idle rose-custom-wheel-button";
     button.textContent = "Custom mods";
-    
+
     // Ensure button has relative positioning for badge (only if not already positioned)
     const computedStyle = window.getComputedStyle(button);
     if (computedStyle.position === "static" || computedStyle.position === "") {
@@ -693,7 +681,9 @@
     }
 
     const modal = document.createElement("div");
-    modal.className = "champ-select-chroma-modal chroma-view ember-view";
+    modal.className = "champ-select-chroma-modal chroma-modal chroma-view ember-view";
+
+    // Header Decoration removed as per user request
 
     // Tab container
     const tabContainer = document.createElement("div");
@@ -704,22 +694,22 @@
     modsTab.className = "lol-uikit-flat-button idle tab-button active";
     modsTab.textContent = "Skins";
     modsTab.dataset.tab = "skins";
-    
+
     const mapsTab = document.createElement("lol-uikit-flat-button");
     mapsTab.className = "lol-uikit-flat-button idle tab-button";
     mapsTab.textContent = "Maps";
     mapsTab.dataset.tab = "maps";
-    
+
     const fontsTab = document.createElement("lol-uikit-flat-button");
     fontsTab.className = "lol-uikit-flat-button idle tab-button";
     fontsTab.textContent = "Fonts";
     fontsTab.dataset.tab = "fonts";
-    
+
     const announcersTab = document.createElement("lol-uikit-flat-button");
     announcersTab.className = "lol-uikit-flat-button idle tab-button";
     announcersTab.textContent = "Announcers";
     announcersTab.dataset.tab = "announcers";
-    
+
     const othersTab = document.createElement("lol-uikit-flat-button");
     othersTab.className = "lol-uikit-flat-button idle tab-button";
     othersTab.textContent = "Others";
@@ -964,25 +954,25 @@
     const calculateWidth = () => {
       const tabContainerEl = modal.querySelector(".tab-container");
       if (!tabContainerEl) return;
-      
+
       // Remove all constraints to measure natural size
       const originalModalWidth = modal.style.width;
       const originalContainerWidth = tabContainerEl.style.width;
-      
+
       tabContainerEl.style.width = "fit-content";
       modal.style.width = "auto";
       modal.style.maxWidth = "none";
       modal.style.minWidth = "0";
-      
+
       // Force reflow multiple times
       void tabContainerEl.offsetWidth;
       void modal.offsetWidth;
       void tabContainerEl.offsetWidth;
-      
+
       // Measure each tab button directly - this should be the most accurate
       const tabs = tabContainerEl.querySelectorAll(".tab-button");
       let totalTabWidth = 0;
-      
+
       tabs.forEach((tab, index) => {
         // Force each tab to render before measuring
         void tab.offsetWidth;
@@ -992,16 +982,17 @@
           totalTabWidth += 4; // gap between tabs (from CSS gap: 4px)
         }
       });
-      
+
       if (totalTabWidth > 0) {
         // With box-sizing: border-box, width includes padding
         // Try using just the tab width - maybe padding is already accounted for somehow
         // Or the measurement is already including what we need
-        modal.style.width = `${totalTabWidth}px`;
+        // Add buffer for padding (16px*2) and border (2px*2) to ensure perfect fit
+        modal.style.width = `${totalTabWidth + 36}px`;
         modal.style.maxWidth = "";
         modal.style.minWidth = "";
         tabContainerEl.style.width = "fit-content";
-        
+
         // Reposition panel after width is set to ensure it's centered above the button
         if (button && isOpen) {
           // Use requestAnimationFrame to ensure width is applied before repositioning
@@ -1014,10 +1005,10 @@
         tabContainerEl.style.width = originalContainerWidth;
       }
     };
-    
+
     // Store on panel for later use
     panel._calculateWidth = calculateWidth;
-    
+
     // Try multiple times to ensure tabs are fully rendered
     setTimeout(calculateWidth, 50);
     setTimeout(calculateWidth, 150);
@@ -1045,21 +1036,21 @@
       if (modal) {
         const modalRect = modal.getBoundingClientRect();
         if (modalRect.width > 0) {
-          flyoutRect = { width: modalRect.width, height: flyoutRect.height || 300 };
+          flyoutRect = { width: modalRect.width, height: flyoutRect.height || 400 };
         } else {
           // Fallback: use button width + estimated padding
-          flyoutRect = { width: rect.width + 32, height: 300 };
+          flyoutRect = { width: rect.width + 32, height: 400 };
         }
       } else {
         // Fallback: use button width + estimated padding
-        flyoutRect = { width: rect.width + 32, height: 300 };
+        flyoutRect = { width: rect.width + 32, height: 400 };
       }
     }
 
     // Center panel in the middle of the screen
     const centerX = (window.innerWidth - flyoutRect.width) / 2;
     const centerY = (window.innerHeight - flyoutRect.height) / 2;
-    
+
     flyoutFrame.style.position = "fixed";
     flyoutFrame.style.overflow = "visible";
     flyoutFrame.style.top = `${centerY}px`;
@@ -1089,7 +1080,7 @@
       const state = window.__roseSkinState || {};
       const championId = Number(state.championId);
       const skinId = Number(state.skinId);
-      
+
       if (championId && skinId) {
         emit({
           type: "select-skin-mod",
@@ -1116,13 +1107,13 @@
       const state = window.__roseSkinState || {};
       const skinId = Number(state.skinId);
       selectedModSkinId = skinId; // Store the skin ID for this selection
-      
+
       buttonElement.textContent = "Selected";
       buttonElement.classList.add("selected");
 
       // Emit selection to Python backend
       const championId = Number(state.championId);
-      
+
       if (championId && skinId) {
         const payload = {
           type: "select-skin-mod",
@@ -1149,9 +1140,9 @@
 
     // Store current selectedModId before clearing the list
     const previousSelectedModId = selectedModId;
-    
+
     modList.innerHTML = "";
-    
+
     // Don't reset selection - restore it if it still exists in the mod list
 
     if (!mods || mods.length === 0) {
@@ -1183,7 +1174,7 @@
       // updateModEntries is always called with mods for the current skin
       const currentSkinId = currentSkinData?.skinId;
       const modIdMatches = (selectedModId === modId || previousSelectedModId === modId);
-      
+
       // Check if skin matches (handle both Number and string comparisons)
       let skinMatches = false;
       if (currentSkinId !== undefined && selectedModSkinId !== null && selectedModSkinId !== undefined) {
@@ -1194,9 +1185,9 @@
         // If this was previously selected and we have current skin data, assume it matches
         skinMatches = true;
       }
-      
+
       const isSelected = modIdMatches && (skinMatches || (previousSelectedModId === modId && currentSkinId !== undefined));
-      
+
       // Restore selection state if this was previously selected for current skin
       if (previousSelectedModId === modId && selectedModId !== modId && currentSkinId !== undefined) {
         selectedModId = modId;
@@ -1206,7 +1197,7 @@
       if (selectedModId === modId && currentSkinId !== undefined && (selectedModSkinId === null || selectedModSkinId === undefined)) {
         selectedModSkinId = Number(currentSkinId);
       }
-      
+
       selectButton.textContent = isSelected ? "Selected" : "Select";
       if (isSelected) {
         selectButton.classList.add("selected");
@@ -1240,9 +1231,9 @@
 
     const mapsListEl = panel._mapsList;
     const loadingEl = panel._mapsLoading;
-    
+
     mapsListEl.innerHTML = "";
-    
+
     if (!mapsList || mapsList.length === 0) {
       loadingEl.textContent = "No maps found";
       loadingEl.style.display = "block";
@@ -1301,9 +1292,9 @@
 
     const fontsListEl = panel._fontsList;
     const loadingEl = panel._fontsLoading;
-    
+
     fontsListEl.innerHTML = "";
-    
+
     if (!fontsList || fontsList.length === 0) {
       loadingEl.textContent = "No fonts found";
       loadingEl.style.display = "block";
@@ -1362,9 +1353,9 @@
 
     const announcersListEl = panel._announcersList;
     const loadingEl = panel._announcersLoading;
-    
+
     announcersListEl.innerHTML = "";
-    
+
     if (!announcersList || announcersList.length === 0) {
       loadingEl.textContent = "No announcers found";
       loadingEl.style.display = "block";
@@ -1423,9 +1414,9 @@
 
     const othersListEl = panel._othersList;
     const loadingEl = panel._othersLoading;
-    
+
     othersListEl.innerHTML = "";
-    
+
     if (!othersList || othersList.length === 0) {
       loadingEl.textContent = "No other mods found";
       loadingEl.style.display = "block";
@@ -1622,7 +1613,7 @@
     button.style.opacity = "1";
     button.style.zIndex = "";
     button.style.transform = "";
-    
+
     // Ensure badge positioning works - button needs to be relative for badge absolute positioning
     // But we need absolute for button positioning, so we'll use a wrapper or ensure badge uses button as reference
     // Actually, absolute children can still position relative to absolute parents, so this should work
@@ -1632,7 +1623,7 @@
 
     // Store reference to container for repositioning
     button._container = targetContainer;
-    
+
     // Force badge positioning after button is attached
     if (button._countBadge) {
       const badge = button._countBadge;
@@ -1724,13 +1715,13 @@
       activeTab = "skins";
       isFirstOpenInSession = false;
     }
-    
+
     const modsTab = panel.querySelector('.tab-button[data-tab="skins"]');
     const mapsTab = panel.querySelector('.tab-button[data-tab="maps"]');
     const fontsTab = panel.querySelector('.tab-button[data-tab="fonts"]');
     const announcersTab = panel.querySelector('.tab-button[data-tab="announcers"]');
     const othersTab = panel.querySelector('.tab-button[data-tab="others"]');
-    
+
     // Update tab buttons based on activeTab
     [modsTab, mapsTab, fontsTab, announcersTab, othersTab].forEach(tab => {
       if (tab && tab.dataset.tab === activeTab) {
@@ -1739,7 +1730,7 @@
         tab.classList.remove("active");
       }
     });
-    
+
     // Update tab content based on activeTab
     [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent, panel._othersContent].forEach(content => {
       if (content) {
@@ -1750,7 +1741,7 @@
         }
       }
     });
-    
+
     // Request data for the active tab
     if (activeTab === "skins") {
       requestModsForCurrentSkin();
@@ -1768,7 +1759,7 @@
     if (panel._calculateWidth) {
       panel._calculateWidth();
     }
-    
+
     // Initial positioning (will be repositioned after width is calculated)
     positionPanel(panel, button);
 
@@ -1786,12 +1777,12 @@
     }, 0);
 
     isOpen = true;
-    
+
     // Update button pressed state
     if (button) {
       button.classList.add("pressed");
     }
-    
+
     // Request data for all tabs when panel opens (in background, but don't switch to them)
     requestModsForCurrentSkin();
     requestMaps();
@@ -1806,7 +1797,7 @@
       if (clickedTab) {
         return; // Don't close if clicking on a tab
       }
-      
+
       if (
         panel &&
         panel.parentNode &&
@@ -1837,12 +1828,12 @@
       panel.style.pointerEvents = "none";
     }
     isOpen = false;
-    
+
     // Update button pressed state
     if (button) {
       button.classList.remove("pressed");
     }
-    
+
     // Clear all selections when panel closes
     selectedModId = null;
     selectedModSkinId = null;
@@ -1933,7 +1924,7 @@
   function handleSkinState(event) {
     // Always request mods to update badge, even if panel is not open
     requestModsForCurrentSkin();
-    
+
     if (!isOpen) {
       return;
     }
@@ -1950,7 +1941,7 @@
     badge.style.left = "0";
     badge.style.transform = "translate(-170%, -70%)";
     badge.style.zIndex = "10";
-    
+
     if (count > 0) {
       badge.textContent = String(count);
       badge.style.display = "flex"; // Explicitly set to flex to match CSS
@@ -1975,7 +1966,7 @@
 
     // Store current skin data for selection restoration
     currentSkinData = { championId, skinId };
-    
+
     // Only restore selection if it's for the same skin
     if (selectedModId && selectedModSkinId !== skinId) {
       // Skin changed, clear selection
@@ -1984,14 +1975,14 @@
     }
 
     const mods = Array.isArray(detail.mods) ? detail.mods : [];
-    
+
     // Update button badge with mod count
     updateButtonBadge(mods.length);
-    
+
     if (!isOpen) {
       return;
     }
-    
+
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
     if (historicMod && !selectedModId) {
@@ -2001,7 +1992,7 @@
         // Normalize paths for comparison
         return modPath.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
       });
-      
+
       if (historicModEntry) {
         // Use the same ID format as updateModEntries uses
         const modId = historicModEntry.relativePath || historicModEntry.modName || `mod-${Date.now()}-${Math.random()}`;
@@ -2009,9 +2000,9 @@
         selectedModSkinId = skinId;
       }
     }
-    
+
     updateModEntries(mods);
-    
+
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedModId) {
       const historicModEntry = mods.find(mod => {
@@ -2043,7 +2034,7 @@
     }
 
     const mapsList = Array.isArray(detail.maps) ? detail.maps : [];
-    
+
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
     if (historicMod && !selectedMapId) {
@@ -2055,16 +2046,16 @@
         // Normalize paths for comparison
         return mapId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
       });
-      
+
       if (historicMap) {
         // Use the same ID format as updateMapsEntries uses
         const mapId = historicMap.id || historicMap.name || `map-${Date.now()}-${Math.random()}`;
         selectedMapId = mapId;
       }
     }
-    
+
     updateMapsEntries(mapsList);
-    
+
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedMapId) {
       const historicMap = mapsList.find(map => {
@@ -2096,7 +2087,7 @@
     }
 
     const fontsList = Array.isArray(detail.fonts) ? detail.fonts : [];
-    
+
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
     if (historicMod && !selectedFontId) {
@@ -2106,15 +2097,15 @@
         // Normalize paths for comparison
         return fontId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
       });
-      
+
       if (historicFont) {
         const fontId = historicFont.id || historicFont.name || `font-${Date.now()}-${Math.random()}`;
         selectedFontId = fontId;
       }
     }
-    
+
     updateFontsEntries(fontsList);
-    
+
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedFontId) {
       const historicFont = fontsList.find(font => {
@@ -2146,7 +2137,7 @@
     }
 
     const announcersList = Array.isArray(detail.announcers) ? detail.announcers : [];
-    
+
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
     if (historicMod && !selectedAnnouncerId) {
@@ -2156,15 +2147,15 @@
         // Normalize paths for comparison
         return announcerId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
       });
-      
+
       if (historicAnnouncer) {
         const announcerId = historicAnnouncer.id || historicAnnouncer.name || `announcer-${Date.now()}-${Math.random()}`;
         selectedAnnouncerId = announcerId;
       }
     }
-    
+
     updateAnnouncersEntries(announcersList);
-    
+
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedAnnouncerId) {
       const historicAnnouncer = announcersList.find(announcer => {
@@ -2196,7 +2187,7 @@
     }
 
     const othersList = Array.isArray(detail.others) ? detail.others : [];
-    
+
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
     if (historicMod && !selectedOtherId) {
@@ -2206,15 +2197,15 @@
         // Normalize paths for comparison
         return otherId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
       });
-      
+
       if (historicOther) {
         const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
         selectedOtherId = otherId;
       }
     }
-    
+
     updateOthersEntries(othersList);
-    
+
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedOtherId) {
       const historicOther = othersList.find(other => {
@@ -2244,7 +2235,7 @@
       }
       return;
     }
-    
+
     // If a new champion is being locked, clear all selections and reset session
     if (locked && !championLocked) {
       selectedModId = null;
@@ -2257,10 +2248,10 @@
       lastChampionSelectSession = championSelectRoot;
       isFirstOpenInSession = true;
     }
-    
+
     championLocked = locked;
     refreshUIVisibility();
-    
+
     // Additional retry after lock state changes to ensure button appears
     if (locked) {
       setTimeout(() => {
@@ -2326,7 +2317,7 @@
 
     window.addEventListener("resize", repositionButton);
     window.addEventListener("scroll", repositionButton);
-    
+
     // Periodic check to ensure button is attached on first champion select
     // This handles cases where events fire before DOM is ready
     let attachmentCheckInterval = setInterval(() => {
@@ -2339,7 +2330,7 @@
         }
       }
     }, 500);
-    
+
     // Stop checking after 10 seconds to avoid infinite checking
     setTimeout(() => {
       clearInterval(attachmentCheckInterval);
