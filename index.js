@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @name ROSE-CustomWheel
  * @author Rose Team
  * @description Custom mod wheel for Pengu Loader - displays installed mods for hovered skins
@@ -263,6 +263,28 @@
       white-space: nowrap !important;
     }
 
+    .rose-custom-wheel-button .count-badge.social-count-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      background: #c89b3c;
+      color: #000;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      box-sizing: border-box;
+      pointer-events: none;
+      z-index: 10;
+      transform: translate(0, 0);
+    }
+
     .${BUTTON_CLASS}[data-hidden],
     .${BUTTON_CLASS}[data-hidden] * {
       pointer-events: none !important;
@@ -379,10 +401,16 @@
     .${PANEL_CLASS} lol-uikit-flyout-frame .caret,
     .${PANEL_CLASS} lol-uikit-flyout-frame [class*="caret"],
     .${PANEL_CLASS} .flyout::part(caret),
-    .${PANEL_CLASS} lol-uikit-flyout-frame::part(caret) {
-      z-index: 3 !important;
-      position: relative;
+    .${PANEL_CLASS} lol-uikit-flyout-frame::part(caret),
+    .${PANEL_CLASS} lol-uikit-flyout-frame::before,
+    .${PANEL_CLASS} lol-uikit-flyout-frame::after,
+    .${PANEL_CLASS} .flyout::before,
+    .${PANEL_CLASS} .flyout::after {
+      display: none !important;
+      visibility: hidden !important;
+      content: none !important;
     }
+
     
     .${PANEL_CLASS} .lc-flyout-content {
       position: relative;
@@ -582,6 +610,20 @@
     }
     button.className = "lol-uikit-flat-button idle rose-custom-wheel-button";
     button.textContent = "Custom mods";
+    
+    // Ensure button has relative positioning for badge (only if not already positioned)
+    const computedStyle = window.getComputedStyle(button);
+    if (computedStyle.position === "static" || computedStyle.position === "") {
+      button.style.position = "relative";
+    }
+
+    // Create count badge
+    const countBadge = document.createElement("div");
+    countBadge.className = "count-badge social-count-badge";
+    countBadge.textContent = "0";
+    countBadge.style.display = "none"; // Hidden by default
+    button.appendChild(countBadge);
+    button._countBadge = countBadge; // Store reference
 
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -869,6 +911,27 @@
     flyoutFrame.appendChild(flyoutContent);
     panel.appendChild(flyoutFrame);
 
+    // Remove arrow/caret at the bottom
+    setTimeout(() => {
+      const carets = flyoutFrame.querySelectorAll('.caret, [class*="caret"]');
+      carets.forEach(caret => {
+        if (caret && caret.parentNode) {
+          caret.style.display = 'none';
+          caret.style.visibility = 'hidden';
+        }
+      });
+      // Also try to remove via shadow DOM if it's a custom element
+      if (flyoutFrame.shadowRoot) {
+        const shadowCarets = flyoutFrame.shadowRoot.querySelectorAll('.caret, [class*="caret"]');
+        shadowCarets.forEach(caret => {
+          if (caret) {
+            caret.style.display = 'none';
+            caret.style.visibility = 'hidden';
+          }
+        });
+      }
+    }, 100);
+
     // Store references
     panel._modList = modList;
     panel._mapsList = mapsList;
@@ -983,16 +1046,16 @@
       }
     }
 
-    // Align panel's right edge with button's right edge (since button is at bottom right)
-    const buttonRight = rect.right;
-    const flyoutRight = window.innerWidth - buttonRight;
-    const flyoutTop = rect.top - flyoutRect.height - 15;
-
-    flyoutFrame.style.position = "absolute";
+    // Center panel in the middle of the screen
+    const centerX = (window.innerWidth - flyoutRect.width) / 2;
+    const centerY = (window.innerHeight - flyoutRect.height) / 2;
+    
+    flyoutFrame.style.position = "fixed";
     flyoutFrame.style.overflow = "visible";
-    flyoutFrame.style.top = `${Math.max(10, flyoutTop)}px`;
-    flyoutFrame.style.right = `${flyoutRight}px`;
-    flyoutFrame.style.left = ""; // Clear left when using right
+    flyoutFrame.style.top = `${centerY}px`;
+    flyoutFrame.style.left = `${centerX}px`;
+    flyoutFrame.style.right = ""; // Clear right when using left
+    flyoutFrame.style.transform = ""; // Remove transform to avoid blur
 
     panelElement.style.position = "fixed";
     panelElement.style.top = "0";
@@ -1835,17 +1898,28 @@
   }
 
   function handleSkinState(event) {
+    // Always request mods to update badge, even if panel is not open
+    requestModsForCurrentSkin();
+    
     if (!isOpen) {
       return;
     }
-    requestModsForCurrentSkin();
+  }
+
+  function updateButtonBadge(count) {
+    if (!button || !button._countBadge) {
+      return;
+    }
+    const badge = button._countBadge;
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+    }
   }
 
   function handleModsResponse(event) {
-    if (!isOpen) {
-      return;
-    }
-
     const detail = event?.detail;
     if (!detail || detail.type !== "skin-mods-response") {
       return;
@@ -1854,6 +1928,7 @@
     const championId = Number(detail?.championId);
     const skinId = Number(detail?.skinId);
     if (!championId || !skinId) {
+      updateButtonBadge(0);
       return;
     }
 
@@ -1868,6 +1943,13 @@
     }
 
     const mods = Array.isArray(detail.mods) ? detail.mods : [];
+    
+    // Update button badge with mod count
+    updateButtonBadge(mods.length);
+    
+    if (!isOpen) {
+      return;
+    }
     
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
