@@ -30,7 +30,7 @@
   let selectedMapId = null;
   let selectedFontId = null;
   let selectedAnnouncerId = null;
-  let selectedOtherId = null;
+  let selectedOtherIds = []; // Array to support multiple selections
   let lastChampionSelectSession = null; // Track current champ select session
   let isFirstOpenInSession = true; // Track if this is first open in current session
 
@@ -1462,7 +1462,7 @@
       selectButton.className = "mod-select-button";
       listItem.setAttribute("data-other-id", otherId);
 
-      if (selectedOtherId === otherId) {
+      if (selectedOtherIds.includes(otherId)) {
         selectButton.textContent = "Selected";
         selectButton.classList.add("selected");
       } else {
@@ -1558,25 +1558,19 @@
   }
 
   function handleOtherSelect(otherId, buttonElement, otherData) {
-    if (selectedOtherId === otherId) {
-      selectedOtherId = null;
+    const index = selectedOtherIds.indexOf(otherId);
+    if (index !== -1) {
+      // Deselect
+      selectedOtherIds.splice(index, 1);
       buttonElement.textContent = "Select";
       buttonElement.classList.remove("selected");
-      emit({ type: "select-other", otherId: null });
+      emit({ type: "select-other", otherId, otherData, action: "deselect" });
     } else {
-      if (selectedOtherId) {
-        const previousButton = panel?._othersList?.querySelector(
-          `[data-other-id="${selectedOtherId}"] .mod-select-button`
-        );
-        if (previousButton) {
-          previousButton.textContent = "Select";
-          previousButton.classList.remove("selected");
-        }
-      }
-      selectedOtherId = otherId;
+      // Select (add to array)
+      selectedOtherIds.push(otherId);
       buttonElement.textContent = "Selected";
       buttonElement.classList.add("selected");
-      emit({ type: "select-other", otherId, otherData });
+      emit({ type: "select-other", otherId, otherData, action: "select" });
     }
   }
 
@@ -2210,7 +2204,7 @@
 
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
-    if (historicMod && !selectedOtherId) {
+    if (historicMod && selectedOtherIds.length === 0) {
       // Find the mod that matches the historic path
       const historicOther = othersList.find(other => {
         const otherId = other.id || "";
@@ -2220,28 +2214,31 @@
 
       if (historicOther) {
         const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
-        selectedOtherId = otherId;
+        if (!selectedOtherIds.includes(otherId)) {
+          selectedOtherIds.push(otherId);
+        }
       }
     }
 
     updateOthersEntries(othersList);
 
     // After UI is updated, emit selection to backend if historic mod was found
-    if (historicMod && selectedOtherId) {
+    if (historicMod && selectedOtherIds.length > 0) {
       const historicOther = othersList.find(other => {
         const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
-        return otherId === selectedOtherId;
+        return selectedOtherIds.includes(otherId);
       });
       if (historicOther) {
+        const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
         // Find the button and update it, then emit
         const button = panel?._othersList?.querySelector(
-          `[data-other-id="${selectedOtherId}"] .mod-select-button`
+          `[data-other-id="${otherId}"] .mod-select-button`
         );
         if (button) {
           button.textContent = "Selected";
           button.classList.add("selected");
         }
-        emit({ type: "select-other", otherId: selectedOtherId, otherData: historicOther });
+        emit({ type: "select-other", otherId, otherData: historicOther, action: "select" });
       }
     }
   }
@@ -2263,7 +2260,7 @@
       selectedMapId = null;
       selectedFontId = null;
       selectedAnnouncerId = null;
-      selectedOtherId = null;
+      selectedOtherIds = [];
       // New champ select session - reset to first open
       lastChampionSelectSession = championSelectRoot;
       isFirstOpenInSession = true;
