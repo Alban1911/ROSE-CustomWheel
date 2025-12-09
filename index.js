@@ -2202,17 +2202,27 @@
 
     const othersList = Array.isArray(detail.others) ? detail.others : [];
 
-    // Check for historic mod and auto-select it
+    // Check for historic mod(s) and auto-select them
+    // historicMod can be a string (legacy) or an array (new format)
     const historicMod = detail.historicMod;
-    if (historicMod && selectedOtherIds.length === 0) {
-      // Find the mod that matches the historic path
-      const historicOther = othersList.find(other => {
-        const otherId = other.id || "";
-        // Normalize paths for comparison
-        return otherId.replace(/\\/g, "/") === historicMod.replace(/\\/g, "/");
-      });
+    const historicMods = Array.isArray(historicMod) ? historicMod : (historicMod ? [historicMod] : []);
+    
+    if (historicMods.length > 0 && selectedOtherIds.length === 0) {
+      // Find all mods that match the historic paths
+      const historicOthers = [];
+      for (const historicPath of historicMods) {
+        const historicOther = othersList.find(other => {
+          const otherId = other.id || "";
+          // Normalize paths for comparison
+          return otherId.replace(/\\/g, "/") === String(historicPath).replace(/\\/g, "/");
+        });
+        if (historicOther) {
+          historicOthers.push(historicOther);
+        }
+      }
 
-      if (historicOther) {
+      // Add all historic mods to selected list
+      for (const historicOther of historicOthers) {
         const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
         if (!selectedOtherIds.includes(otherId)) {
           selectedOtherIds.push(otherId);
@@ -2222,23 +2232,25 @@
 
     updateOthersEntries(othersList);
 
-    // After UI is updated, emit selection to backend if historic mod was found
-    if (historicMod && selectedOtherIds.length > 0) {
-      const historicOther = othersList.find(other => {
-        const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
-        return selectedOtherIds.includes(otherId);
-      });
-      if (historicOther) {
-        const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
-        // Find the button and update it, then emit
-        const button = panel?._othersList?.querySelector(
-          `[data-other-id="${otherId}"] .mod-select-button`
-        );
-        if (button) {
-          button.textContent = "Selected";
-          button.classList.add("selected");
+    // After UI is updated, emit selection to backend for all historic mods found
+    if (historicMods.length > 0 && selectedOtherIds.length > 0) {
+      for (const historicPath of historicMods) {
+        const historicOther = othersList.find(other => {
+          const otherId = other.id || "";
+          return otherId.replace(/\\/g, "/") === String(historicPath).replace(/\\/g, "/");
+        });
+        if (historicOther) {
+          const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
+          // Find the button and update it, then emit
+          const button = panel?._othersList?.querySelector(
+            `[data-other-id="${otherId}"] .mod-select-button`
+          );
+          if (button) {
+            button.textContent = "Selected";
+            button.classList.add("selected");
+          }
+          emit({ type: "select-other", otherId, otherData: historicOther, action: "select" });
         }
-        emit({ type: "select-other", otherId, otherData: historicOther, action: "select" });
       }
     }
   }
