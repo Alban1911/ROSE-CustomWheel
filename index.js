@@ -33,6 +33,91 @@
   let selectedOtherIds = []; // Array to support multiple selections
   let lastChampionSelectSession = null; // Track current champ select session
   let isFirstOpenInSession = true; // Track if this is first open in current session
+  let lastOthersResponse = []; // Cache of last "others" payload so category tabs can re-render without refetch
+  let rightPaneMode = "summary"; // "summary" | "picker"
+
+  const OTHER_CATEGORY_TABS = [
+    { id: "ui", label: "UI", prefixes: ["ui/"] },
+    { id: "voiceover", label: "Voiceover", prefixes: ["voiceover/", "vo/"] },
+    { id: "loading_screen", label: "Loading Screen", prefixes: ["loading_screen/", "loading-screen/", "loading screen/"] },
+    { id: "vfx", label: "VFX", prefixes: ["vfx/"] },
+    { id: "sfx", label: "SFX", prefixes: ["sfx/"] },
+    { id: "others", label: "Others", prefixes: [] }, // fallback bucket
+  ];
+
+  const SUMMARY_TABS = [
+    { id: "skins", label: "Skins" },
+    { id: "maps", label: "Maps" },
+    { id: "fonts", label: "Fonts" },
+    { id: "announcers", label: "Announcers" },
+    ...OTHER_CATEGORY_TABS.map((t) => ({ id: t.id, label: t.label })),
+  ];
+
+  function normalizePathLike(value) {
+    return String(value || "").replace(/\\/g, "/").trim().toLowerCase();
+  }
+
+  function getSelectedSummaryForTab(tabId) {
+    if (tabId === "skins") {
+      if (!championLocked) return "Waiting for champ lock…";
+      return selectedModId ? String(selectedModId) : "None";
+    }
+    if (tabId === "maps") return selectedMapId ? String(selectedMapId) : "None";
+    if (tabId === "fonts") return selectedFontId ? String(selectedFontId) : "None";
+    if (tabId === "announcers") return selectedAnnouncerId ? String(selectedAnnouncerId) : "None";
+
+    const cat = OTHER_CATEGORY_TABS.find((t) => t.id === tabId);
+    const all = Array.isArray(selectedOtherIds) ? selectedOtherIds : [];
+    if (!cat || all.length === 0) return "None";
+
+    const otherCats = OTHER_CATEGORY_TABS.filter((t) => t.id !== "others");
+    const matchesPrefix = (id, prefixes) =>
+      (prefixes || []).some((p) => normalizePathLike(id).startsWith(p));
+
+    if (tabId === "others") {
+      const othersOnly = all.filter(
+        (id) => !otherCats.some((t) => matchesPrefix(id, t.prefixes))
+      );
+      return othersOnly.length ? othersOnly.join(", ") : "None";
+    }
+
+    const filtered = all.filter((id) => matchesPrefix(id, cat.prefixes));
+    return filtered.length ? filtered.join(", ") : "None";
+  }
+
+  function getTabLabel(tabId) {
+    return SUMMARY_TABS.find((t) => t.id === tabId)?.label || String(tabId || "");
+  }
+
+  function refreshSummaryValues() {
+    if (!panel || !panel._summaryValuesByTab) return;
+    for (const tab of SUMMARY_TABS) {
+      const el = panel._summaryValuesByTab[tab.id];
+      if (el) {
+        el.textContent = getSelectedSummaryForTab(tab.id);
+      }
+    }
+  }
+
+  function setRightPaneMode(mode) {
+    rightPaneMode = mode;
+    if (!panel) return;
+
+    if (panel._summaryView) {
+      panel._summaryView.style.display = mode === "summary" ? "flex" : "none";
+    }
+    if (panel._pickerView) {
+      if (mode === "picker") panel._pickerView.classList.add("active");
+      else panel._pickerView.classList.remove("active");
+    }
+    if (panel._backBtn) {
+      panel._backBtn.style.display = mode === "picker" ? "inline-block" : "none";
+    }
+    if (panel._rightTitle) {
+      panel._rightTitle.textContent =
+        mode === "picker" ? `Choose • ${getTabLabel(activeTab)}` : "Custom Mods";
+    }
+  }
 
   // WebSocket bridge for communication
   let BRIDGE_PORT = 50000;
@@ -373,17 +458,19 @@
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
       display: flex;
       flex-direction: column;
-      width: auto;
-      min-width: 320px;
+      /* Stable size (clamped to viewport) */
+      width: 980px;
+      max-width: calc(100vw - 80px);
+      min-width: 720px;
       position: relative;
       z-index: 0;
       padding: 16px;
       box-sizing: border-box;
       overflow: hidden;
       color: #f0e6d2;
-      height: 400px !important;
-      min-height: 400px !important;
-      max-height: 400px !important;
+      height: 520px !important;
+      min-height: 420px !important;
+      max-height: calc(100vh - 120px) !important;
     }
     
     .${PANEL_CLASS} .chroma-modal.chroma-view {
@@ -417,55 +504,103 @@
     }
 
     /* Tab Navigation */
-    .${PANEL_CLASS} .tab-container {
+    /* ===== Unified Summary rows (category + status + change in one row) ===== */
+
+    .${PANEL_CLASS} .rose-wheel-right-header {
       display: flex;
-      justify-content: center;
-      gap: 4px;
-      margin-bottom: 12px;
-      border-bottom: 2px solid #3c3c41;
-      padding-top: 0;
-      padding-bottom: 16px;
-      width: 100%;
-      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #3c3c41;
+      margin-bottom: 10px;
       flex-shrink: 0;
     }
 
-    .${PANEL_CLASS} .tab-button {
-      background: transparent;
-      border: none;
-      color: #a09b8c;
-      padding: 8px 12px;
-      cursor: pointer;
-      font-family: inherit;
+    .${PANEL_CLASS} .rose-wheel-right-title {
       font-weight: 700;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      transition: all 0.2s ease;
-      position: relative;
-      flex-shrink: 0;
+      color: #f0e6d2;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .${PANEL_CLASS} .tab-button:hover {
-      color: #f0e6d2;
-      background: rgba(255, 255, 255, 0.05);
+    .${PANEL_CLASS} .rose-wheel-summary {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 10px;
+      padding: 6px 2px;
+      overflow-y: auto;
     }
 
-    .${PANEL_CLASS} .tab-button.active {
-      color: #f0e6d2;
+    .${PANEL_CLASS} .rose-wheel-summary::-webkit-scrollbar { width: 6px; }
+    .${PANEL_CLASS} .rose-wheel-summary::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+    .${PANEL_CLASS} .rose-wheel-summary::-webkit-scrollbar-thumb { background: #5b5a56; border-radius: 3px; }
+
+    .${PANEL_CLASS} .rose-wheel-summary-row {
+      display: grid;
+      grid-template-columns: 220px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border: 1px solid #3c3c41;
+      background: linear-gradient(to right, rgba(30, 35, 40, 0.8), rgba(30, 35, 40, 0.5));
     }
 
-    .${PANEL_CLASS} .tab-button.active::after {
-      content: '';
-      position: absolute;
-      bottom: -2px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: #c8aa6e;
-      box-shadow: 0 0 8px #c8aa6e;
+    .${PANEL_CLASS} .rose-wheel-category-label {
+      color: #f0e6d2;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 12px;
+      border: 1px solid #3c3c41;
+      background: rgba(255,255,255,0.02);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    .${PANEL_CLASS} .rose-wheel-summary-left {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .${PANEL_CLASS} .rose-wheel-summary-label {
+      color: #a09b8c;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .${PANEL_CLASS} .rose-wheel-summary-value {
+      color: #f0e6d2;
+      font-size: 13px;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .${PANEL_CLASS} .rose-wheel-picker {
+      flex: 1;
+      min-height: 0;
+      display: none;
+    }
+
+    .${PANEL_CLASS} .rose-wheel-picker.active {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    /* (Tab buttons removed from Summary UI; navigation is via per-row Change buttons) */
 
     .${PANEL_CLASS} .tab-content {
       display: none;
@@ -483,6 +618,7 @@
     .${PANEL_CLASS} .mod-selection {
       pointer-events: all;
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: 4px;
@@ -705,52 +841,22 @@
 
     // Header Decoration removed as per user request
 
-    // Tab container
-    const tabContainer = document.createElement("div");
-    tabContainer.className = "tab-container";
+    const isOtherCategoryTab = (tabName) => OTHER_CATEGORY_TABS.some((t) => t.id === tabName);
 
-    // Create tabs using League UI components
-    const modsTab = document.createElement("lol-uikit-flat-button");
-    modsTab.className = "lol-uikit-flat-button idle tab-button active";
-    modsTab.textContent = "Skins";
-    modsTab.dataset.tab = "skins";
-
-    const mapsTab = document.createElement("lol-uikit-flat-button");
-    mapsTab.className = "lol-uikit-flat-button idle tab-button";
-    mapsTab.textContent = "Maps";
-    mapsTab.dataset.tab = "maps";
-
-    const fontsTab = document.createElement("lol-uikit-flat-button");
-    fontsTab.className = "lol-uikit-flat-button idle tab-button";
-    fontsTab.textContent = "Fonts";
-    fontsTab.dataset.tab = "fonts";
-
-    const announcersTab = document.createElement("lol-uikit-flat-button");
-    announcersTab.className = "lol-uikit-flat-button idle tab-button";
-    announcersTab.textContent = "Announcers";
-    announcersTab.dataset.tab = "announcers";
-
-    const othersTab = document.createElement("lol-uikit-flat-button");
-    othersTab.className = "lol-uikit-flat-button idle tab-button";
-    othersTab.textContent = "Others";
-    othersTab.dataset.tab = "others";
-
-    // Tab click handlers
     const switchTab = (tabName) => {
       activeTab = tabName;
-      // Update tab buttons
-      [modsTab, mapsTab, fontsTab, announcersTab, othersTab].forEach(tab => {
-        if (tab.dataset.tab === tabName) {
-          tab.classList.add("active");
-        } else {
-          tab.classList.remove("active");
-        }
-      });
       // Update tab content
-      [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent, panel._othersContent].forEach(content => {
-        if (content.dataset.tab === tabName) {
+      const allContents = [
+        panel._modsContent,
+        panel._mapsContent,
+        panel._fontsContent,
+        panel._announcersContent,
+        ...OTHER_CATEGORY_TABS.map((t) => panel[`_${t.id}Content`]).filter(Boolean),
+      ];
+      allContents.forEach((content) => {
+        if (content && content.dataset && content.dataset.tab === tabName) {
           content.classList.add("active");
-        } else {
+        } else if (content) {
           content.classList.remove("active");
         }
       });
@@ -763,37 +869,16 @@
         requestFonts();
       } else if (tabName === "announcers") {
         requestAnnouncers();
-      } else if (tabName === "others") {
+      } else if (isOtherCategoryTab(tabName)) {
         requestOthers();
       }
+
+      // Update header title for picker context
+      if (panel && panel._rightTitle) {
+        panel._rightTitle.textContent =
+          rightPaneMode === "picker" ? `Choose • ${getTabLabel(activeTab)}` : "Custom Mods";
+      }
     };
-
-    modsTab.addEventListener("click", (e) => {
-      e.stopPropagation();
-      switchTab("skins");
-    });
-    mapsTab.addEventListener("click", (e) => {
-      e.stopPropagation();
-      switchTab("maps");
-    });
-    fontsTab.addEventListener("click", (e) => {
-      e.stopPropagation();
-      switchTab("fonts");
-    });
-    announcersTab.addEventListener("click", (e) => {
-      e.stopPropagation();
-      switchTab("announcers");
-    });
-    othersTab.addEventListener("click", (e) => {
-      e.stopPropagation();
-      switchTab("others");
-    });
-
-    tabContainer.appendChild(modsTab);
-    tabContainer.appendChild(mapsTab);
-    tabContainer.appendChild(fontsTab);
-    tabContainer.appendChild(announcersTab);
-    tabContainer.appendChild(othersTab);
 
     // Scrollable area for mod list
     let scrollable;
@@ -824,9 +909,12 @@
     announcersContent.className = "tab-content";
     announcersContent.dataset.tab = "announcers";
 
-    const othersContent = document.createElement("div");
-    othersContent.className = "tab-content";
-    othersContent.dataset.tab = "others";
+    const otherContents = OTHER_CATEGORY_TABS.map((t) => {
+      const content = document.createElement("div");
+      content.className = "tab-content";
+      content.dataset.tab = t.id;
+      return content;
+    });
 
     // Create ul lists for each tab
     const modList = document.createElement("ul");
@@ -865,14 +953,22 @@
     announcersList.style.width = "100%";
     announcersList.style.gap = "4px";
 
-    const othersList = document.createElement("ul");
-    othersList.style.listStyle = "none";
-    othersList.style.margin = "0";
-    othersList.style.padding = "0";
-    othersList.style.display = "flex";
-    othersList.style.flexDirection = "column";
-    othersList.style.width = "100%";
-    othersList.style.gap = "4px";
+    const createSimpleList = () => {
+      const ul = document.createElement("ul");
+      ul.style.listStyle = "none";
+      ul.style.margin = "0";
+      ul.style.padding = "0";
+      ul.style.display = "flex";
+      ul.style.flexDirection = "column";
+      ul.style.width = "100%";
+      ul.style.gap = "4px";
+      return ul;
+    };
+
+    const otherLists = OTHER_CATEGORY_TABS.reduce((acc, t) => {
+      acc[t.id] = createSimpleList();
+      return acc;
+    }, {});
 
     // Loading elements for each tab
     const modsLoading = document.createElement("div");
@@ -895,10 +991,14 @@
     announcersLoading.textContent = "Loading announcers…";
     announcersLoading.style.display = "none";
 
-    const othersLoading = document.createElement("div");
-    othersLoading.className = "mod-loading";
-    othersLoading.textContent = "Loading others…";
-    othersLoading.style.display = "none";
+    const otherLoadingEls = OTHER_CATEGORY_TABS.reduce((acc, t) => {
+      const el = document.createElement("div");
+      el.className = "mod-loading";
+      el.textContent = `Loading ${t.label.toLowerCase()}…`;
+      el.style.display = "none";
+      acc[t.id] = el;
+      return acc;
+    }, {});
 
     // Assemble mods content
     modsContent.appendChild(modsLoading);
@@ -914,19 +1014,108 @@
     announcersContent.appendChild(announcersLoading);
     announcersContent.appendChild(announcersList);
 
-    othersContent.appendChild(othersLoading);
-    othersContent.appendChild(othersList);
+    otherContents.forEach((content) => {
+      const tabId = content.dataset.tab;
+      content.appendChild(otherLoadingEls[tabId]);
+      content.appendChild(otherLists[tabId]);
+    });
 
     // Add tab content to scrollable (tabs stay fixed outside)
     scrollable.appendChild(modsContent);
     scrollable.appendChild(mapsContent);
     scrollable.appendChild(fontsContent);
     scrollable.appendChild(announcersContent);
-    scrollable.appendChild(othersContent);
+    otherContents.forEach((content) => scrollable.appendChild(content));
 
-    // Add tab container and scrollable to modal (tabs outside scrollable)
-    modal.appendChild(tabContainer);
-    modal.appendChild(scrollable);
+    // Header + Summary + Picker (Summary rows contain the category buttons on the left)
+    const rightHeader = document.createElement("div");
+    rightHeader.className = "rose-wheel-right-header";
+
+    const rightTitle = document.createElement("div");
+    rightTitle.className = "rose-wheel-right-title";
+    rightTitle.textContent = "Custom Mods";
+
+    const headerButtons = document.createElement("div");
+    headerButtons.style.display = "flex";
+    headerButtons.style.gap = "8px";
+
+    const backBtn = document.createElement("button");
+    backBtn.className = "mod-select-button";
+    backBtn.textContent = "Back";
+    backBtn.style.display = "none";
+
+    headerButtons.appendChild(backBtn);
+
+    rightHeader.appendChild(rightTitle);
+    rightHeader.appendChild(headerButtons);
+
+    // Summary view (all categories)
+    const summaryView = document.createElement("div");
+    summaryView.className = "rose-wheel-summary";
+
+    panel._summaryValuesByTab = {};
+
+    SUMMARY_TABS.forEach((tab) => {
+      const row = document.createElement("div");
+      row.className = "rose-wheel-summary-row";
+
+      // Left cell: category label (buttons are no longer needed)
+      const categoryLabel = document.createElement("div");
+      categoryLabel.className = "rose-wheel-category-label";
+      categoryLabel.textContent = tab.label;
+
+      // Middle cell: value
+      const left = document.createElement("div");
+      left.className = "rose-wheel-summary-left";
+
+      const label = document.createElement("div");
+      label.className = "rose-wheel-summary-label";
+      label.textContent = tab.label;
+
+      const value = document.createElement("div");
+      value.className = "rose-wheel-summary-value";
+      value.textContent = getSelectedSummaryForTab(tab.id);
+      panel._summaryValuesByTab[tab.id] = value;
+
+      left.appendChild(label);
+      left.appendChild(value);
+
+      const changeBtn = document.createElement("button");
+      changeBtn.className = "mod-select-button";
+      changeBtn.textContent = "Change";
+      changeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        switchTab(tab.id);
+        setRightPaneMode("picker");
+        refreshSummaryValues();
+      });
+
+      row.appendChild(categoryLabel);
+
+      row.appendChild(left);
+      row.appendChild(changeBtn);
+      summaryView.appendChild(row);
+    });
+
+    // Picker view (reuses existing scrollable with tab contents)
+    const pickerView = document.createElement("div");
+    pickerView.className = "rose-wheel-picker";
+    pickerView.appendChild(scrollable);
+
+    backBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setRightPaneMode("summary");
+      refreshSummaryValues();
+    });
+
+    panel._summaryView = summaryView;
+    panel._pickerView = pickerView;
+    panel._backBtn = backBtn;
+    panel._rightTitle = rightTitle;
+
+    modal.appendChild(rightHeader);
+    modal.appendChild(summaryView);
+    modal.appendChild(pickerView);
     flyoutContent.appendChild(modal);
     flyoutFrame.appendChild(flyoutContent);
     panel.appendChild(flyoutFrame);
@@ -957,82 +1146,27 @@
     panel._mapsList = mapsList;
     panel._fontsList = fontsList;
     panel._announcersList = announcersList;
-    panel._othersList = othersList;
+    OTHER_CATEGORY_TABS.forEach((t) => {
+      panel[`_${t.id}List`] = otherLists[t.id];
+      panel[`_${t.id}Loading`] = otherLoadingEls[t.id];
+      panel[`_${t.id}Content`] = otherContents.find((c) => c.dataset.tab === t.id);
+    });
     panel._modsLoading = modsLoading;
     panel._mapsLoading = mapsLoading;
     panel._fontsLoading = fontsLoading;
     panel._announcersLoading = announcersLoading;
-    panel._othersLoading = othersLoading;
     panel._modsContent = modsContent;
     panel._mapsContent = mapsContent;
     panel._fontsContent = fontsContent;
     panel._announcersContent = announcersContent;
-    panel._othersContent = othersContent;
     panel._loadingEl = modsLoading; // Keep for backward compatibility
 
-    // Function to calculate and set panel width to exactly match tab container width
-    const calculateWidth = () => {
-      const tabContainerEl = modal.querySelector(".tab-container");
-      if (!tabContainerEl) return;
+    // Width is now stable (CSS-controlled); no dynamic calculation needed.
+    panel._calculateWidth = null;
 
-      // Remove all constraints to measure natural size
-      const originalModalWidth = modal.style.width;
-      const originalContainerWidth = tabContainerEl.style.width;
-
-      tabContainerEl.style.width = "fit-content";
-      modal.style.width = "auto";
-      modal.style.maxWidth = "none";
-      modal.style.minWidth = "0";
-
-      // Force reflow multiple times
-      void tabContainerEl.offsetWidth;
-      void modal.offsetWidth;
-      void tabContainerEl.offsetWidth;
-
-      // Measure each tab button directly - this should be the most accurate
-      const tabs = tabContainerEl.querySelectorAll(".tab-button");
-      let totalTabWidth = 0;
-
-      tabs.forEach((tab, index) => {
-        // Force each tab to render before measuring
-        void tab.offsetWidth;
-        const rect = tab.getBoundingClientRect();
-        totalTabWidth += rect.width;
-        if (index < tabs.length - 1) {
-          totalTabWidth += 4; // gap between tabs (from CSS gap: 4px)
-        }
-      });
-
-      if (totalTabWidth > 0) {
-        // With box-sizing: border-box, width includes padding
-        // Try using just the tab width - maybe padding is already accounted for somehow
-        // Or the measurement is already including what we need
-        // Add buffer for padding (16px*2) and border (2px*2) to ensure perfect fit
-        modal.style.width = `${totalTabWidth + 36}px`;
-        modal.style.maxWidth = "";
-        modal.style.minWidth = "";
-        tabContainerEl.style.width = "fit-content";
-
-        // Reposition panel after width is set to ensure it's centered above the button
-        if (button && isOpen) {
-          // Use requestAnimationFrame to ensure width is applied before repositioning
-          requestAnimationFrame(() => {
-            positionPanel(panel, button);
-          });
-        }
-      } else {
-        modal.style.width = originalModalWidth;
-        tabContainerEl.style.width = originalContainerWidth;
-      }
-    };
-
-    // Store on panel for later use
-    panel._calculateWidth = calculateWidth;
-
-    // Try multiple times to ensure tabs are fully rendered
-    setTimeout(calculateWidth, 50);
-    setTimeout(calculateWidth, 150);
-    setTimeout(calculateWidth, 300);
+    // Start in summary mode by default
+    setRightPaneMode("summary");
+    refreshSummaryValues();
 
     return panel;
   }
@@ -1148,6 +1282,8 @@
         console.warn(`[ROSE-CustomWheel] Cannot send mod selection - missing championId or skinId:`, { championId, skinId });
       }
     }
+
+    refreshSummaryValues();
   }
 
   function updateModEntries(mods) {
@@ -1428,64 +1564,101 @@
   }
 
   function updateOthersEntries(othersList) {
-    if (!panel || !panel._othersList || !panel._othersLoading) {
+    if (!panel) {
       return;
     }
 
-    const othersListEl = panel._othersList;
-    const loadingEl = panel._othersLoading;
+    const normalizePath = (value) =>
+      String(value || "")
+        .replace(/\\/g, "/")
+        .trim()
+        .toLowerCase();
 
-    othersListEl.innerHTML = "";
+    const getOtherPath = (other) =>
+      normalizePath(other?.id || other?.relativePath || other?.name || other?.modName);
 
-    if (!othersList || othersList.length === 0) {
-      loadingEl.textContent = "No other mods found";
-      loadingEl.style.display = "block";
-      return;
-    }
+    const categorizeOther = (other) => {
+      const p = getOtherPath(other);
+      const match = OTHER_CATEGORY_TABS.find((t) =>
+        (t.prefixes || []).some((prefix) => p.startsWith(prefix))
+      );
+      return match ? match.id : "others";
+    };
 
-    loadingEl.style.display = "none";
+    const createBuckets = () =>
+      OTHER_CATEGORY_TABS.reduce((acc, t) => {
+        acc[t.id] = [];
+        return acc;
+      }, {});
 
-    othersList.forEach((other) => {
-      const listItem = document.createElement("li");
-      const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
-
-      // Create a row container for name and button
-      const otherNameRow = document.createElement("div");
-      otherNameRow.className = "mod-name-row";
-
-      const otherName = document.createElement("div");
-      otherName.className = "mod-name";
-      otherName.textContent = other.name || "Unnamed other";
-      otherNameRow.appendChild(otherName);
-
-      const selectButton = document.createElement("button");
-      selectButton.className = "mod-select-button";
-      listItem.setAttribute("data-other-id", otherId);
-
-      if (selectedOtherIds.includes(otherId)) {
-        selectButton.textContent = "Selected";
-        selectButton.classList.add("selected");
-      } else {
-        selectButton.textContent = "Select";
-      }
-
-      selectButton.addEventListener("click", (e) => {
-        e.stopPropagation();
-        handleOtherSelect(otherId, selectButton, other);
-      });
-
-      otherNameRow.appendChild(selectButton);
-      listItem.appendChild(otherNameRow);
-
-      if (other.description) {
-        const otherDesc = document.createElement("div");
-        otherDesc.className = "mod-description";
-        otherDesc.textContent = other.description;
-        listItem.appendChild(otherDesc);
-      }
-
-      othersListEl.appendChild(listItem);
+    const buckets = createBuckets();
+    (othersList || []).forEach((other) => {
+      const bucketId = categorizeOther(other);
+      if (!buckets[bucketId]) buckets[bucketId] = [];
+      buckets[bucketId].push(other);
     });
+
+    const renderCategory = (categoryId, items) => {
+      const listEl = panel[`_${categoryId}List`];
+      const loadingEl = panel[`_${categoryId}Loading`];
+      if (!listEl || !loadingEl) {
+        return;
+      }
+
+      listEl.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        const label = OTHER_CATEGORY_TABS.find((t) => t.id === categoryId)?.label || "mods";
+        loadingEl.textContent = `No ${label.toLowerCase()} found`;
+        loadingEl.style.display = "block";
+        return;
+      }
+
+      loadingEl.style.display = "none";
+
+      items.forEach((other) => {
+        const listItem = document.createElement("li");
+        const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
+
+        const otherNameRow = document.createElement("div");
+        otherNameRow.className = "mod-name-row";
+
+        const otherName = document.createElement("div");
+        otherName.className = "mod-name";
+        otherName.textContent = other.name || other.modName || "Unnamed mod";
+        otherNameRow.appendChild(otherName);
+
+        const selectButton = document.createElement("button");
+        selectButton.className = "mod-select-button";
+        listItem.setAttribute("data-other-id", otherId);
+
+        if (selectedOtherIds.includes(otherId)) {
+          selectButton.textContent = "Selected";
+          selectButton.classList.add("selected");
+        } else {
+          selectButton.textContent = "Select";
+        }
+
+        selectButton.addEventListener("click", (e) => {
+          e.stopPropagation();
+          handleOtherSelect(otherId, selectButton, other);
+        });
+
+        otherNameRow.appendChild(selectButton);
+        listItem.appendChild(otherNameRow);
+
+        if (other.description) {
+          const otherDesc = document.createElement("div");
+          otherDesc.className = "mod-description";
+          otherDesc.textContent = other.description;
+          listItem.appendChild(otherDesc);
+        }
+
+        listEl.appendChild(listItem);
+      });
+    };
+
+    OTHER_CATEGORY_TABS.forEach((t) => renderCategory(t.id, buckets[t.id] || []));
   }
 
   function handleMapSelect(mapId, buttonElement, mapData) {
@@ -1509,6 +1682,8 @@
       buttonElement.classList.add("selected");
       emit({ type: "select-map", mapId, mapData });
     }
+
+    refreshSummaryValues();
   }
 
   function handleFontSelect(fontId, buttonElement, fontData) {
@@ -1532,6 +1707,8 @@
       buttonElement.classList.add("selected");
       emit({ type: "select-font", fontId, fontData });
     }
+
+    refreshSummaryValues();
   }
 
   function handleAnnouncerSelect(announcerId, buttonElement, announcerData) {
@@ -1555,6 +1732,8 @@
       buttonElement.classList.add("selected");
       emit({ type: "select-announcer", announcerId, announcerData });
     }
+
+    refreshSummaryValues();
   }
 
   function handleOtherSelect(otherId, buttonElement, otherData) {
@@ -1572,6 +1751,8 @@
       buttonElement.classList.add("selected");
       emit({ type: "select-other", otherId, otherData, action: "select" });
     }
+
+    refreshSummaryValues();
   }
 
   function findButtonContainer() {
@@ -1730,29 +1911,16 @@
       isFirstOpenInSession = false;
     }
 
-    const modsTab = panel.querySelector('.tab-button[data-tab="skins"]');
-    const mapsTab = panel.querySelector('.tab-button[data-tab="maps"]');
-    const fontsTab = panel.querySelector('.tab-button[data-tab="fonts"]');
-    const announcersTab = panel.querySelector('.tab-button[data-tab="announcers"]');
-    const othersTab = panel.querySelector('.tab-button[data-tab="others"]');
+    // Always start in summary view when opening the panel
+    setRightPaneMode("summary");
+    refreshSummaryValues();
 
-    // Update tab buttons based on activeTab
-    [modsTab, mapsTab, fontsTab, announcersTab, othersTab].forEach(tab => {
-      if (tab && tab.dataset.tab === activeTab) {
-        tab.classList.add("active");
-      } else if (tab) {
-        tab.classList.remove("active");
-      }
-    });
-
-    // Update tab content based on activeTab
-    [panel._modsContent, panel._mapsContent, panel._fontsContent, panel._announcersContent, panel._othersContent].forEach(content => {
-      if (content) {
-        if (content.dataset.tab === activeTab) {
-          content.classList.add("active");
-        } else {
-          content.classList.remove("active");
-        }
+    // Update tab content based on activeTab (generic)
+    panel.querySelectorAll(".tab-content").forEach((content) => {
+      if (content && content.dataset && content.dataset.tab === activeTab) {
+        content.classList.add("active");
+      } else if (content) {
+        content.classList.remove("active");
       }
     });
 
@@ -1765,13 +1933,8 @@
       requestFonts();
     } else if (activeTab === "announcers") {
       requestAnnouncers();
-    } else if (activeTab === "others") {
+    } else if (OTHER_CATEGORY_TABS.some((t) => t.id === activeTab)) {
       requestOthers();
-    }
-
-    // Calculate width first, then position
-    if (panel._calculateWidth) {
-      panel._calculateWidth();
     }
 
     // Initial positioning (will be repositioned after width is calculated)
@@ -1780,13 +1943,8 @@
     // Force a reflow
     panel.offsetHeight;
 
-    // Reposition after render and width calculation
+    // Reposition after render
     setTimeout(() => {
-      // Recalculate width to ensure tabs are fully rendered
-      if (panel._calculateWidth) {
-        panel._calculateWidth();
-      }
-      // Position after width is set
       positionPanel(panel, button);
     }, 0);
 
@@ -1806,12 +1964,6 @@
 
     // Add click outside handler
     const closeHandler = (e) => {
-      // Check if click is on a tab button (they might be custom elements)
-      const clickedTab = e.target.closest(".tab-button");
-      if (clickedTab) {
-        return; // Don't close if clicking on a tab
-      }
-
       if (
         panel &&
         panel.parentNode &&
@@ -1848,13 +2000,7 @@
       button.classList.remove("pressed");
     }
 
-    // Clear all selections when panel closes
-    selectedModId = null;
-    selectedModSkinId = null;
-    selectedMapId = null;
-    selectedFontId = null;
-    selectedAnnouncerId = null;
-    selectedOtherId = null;
+    // Keep selections when closing; users use the panel for quick checking/changing.
   }
 
   function requestModsForCurrentSkin() {
@@ -1939,9 +2085,13 @@
   // Backend should look in: %LOCALAPPDATA%\Rose\mods\others
   function requestOthers() {
     emit({ type: "request-others" });
-    if (panel && panel._othersLoading) {
-      panel._othersLoading.textContent = "Loading others…";
-      panel._othersLoading.style.display = "block";
+    if (!panel) return;
+
+    const loadingEl = panel[`_${activeTab}Loading`] || panel._othersLoading;
+    if (loadingEl) {
+      const label = OTHER_CATEGORY_TABS.find((t) => t.id === activeTab)?.label || "others";
+      loadingEl.textContent = `Loading ${label.toLowerCase()}…`;
+      loadingEl.style.display = "block";
     }
   }
 
@@ -2201,16 +2351,17 @@
   }
 
   function handleOthersResponse(event) {
-    if (!isOpen || activeTab !== "others") {
-      return;
-    }
-
     const detail = event?.detail;
     if (!detail || detail.type !== "others-response") {
       return;
     }
 
     const othersList = Array.isArray(detail.others) ? detail.others : [];
+    lastOthersResponse = othersList;
+
+    if (!isOpen) {
+      return;
+    }
 
     // Check for historic mod(s) and auto-select them
     // historicMod can be a string (legacy) or an array (new format)
@@ -2252,9 +2403,12 @@
         if (historicOther) {
           const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
           // Find the button and update it, then emit
-          const button = panel?._othersList?.querySelector(
-            `[data-other-id="${otherId}"] .mod-select-button`
-          );
+          const button = OTHER_CATEGORY_TABS.map((t) => panel?.[`_${t.id}List`])
+            .filter(Boolean)
+            .map((listEl) =>
+              listEl.querySelector(`[data-other-id="${otherId}"] .mod-select-button`)
+            )
+            .find(Boolean);
           if (button) {
             button.textContent = "Selected";
             button.classList.add("selected");
@@ -2290,6 +2444,7 @@
 
     championLocked = locked;
     refreshUIVisibility();
+    refreshSummaryValues();
 
     // Additional retry after lock state changes to ensure button appears
     if (locked) {
