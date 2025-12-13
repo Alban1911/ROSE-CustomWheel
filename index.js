@@ -492,6 +492,14 @@
     .${PANEL_CLASS} .flyout [class*="caret"],
     .${PANEL_CLASS} lol-uikit-flyout-frame .caret,
     .${PANEL_CLASS} lol-uikit-flyout-frame [class*="caret"],
+    .${PANEL_CLASS} .flyout .caret::before,
+    .${PANEL_CLASS} .flyout .caret::after,
+    .${PANEL_CLASS} .flyout [class*="caret"]::before,
+    .${PANEL_CLASS} .flyout [class*="caret"]::after,
+    .${PANEL_CLASS} lol-uikit-flyout-frame .caret::before,
+    .${PANEL_CLASS} lol-uikit-flyout-frame .caret::after,
+    .${PANEL_CLASS} lol-uikit-flyout-frame [class*="caret"]::before,
+    .${PANEL_CLASS} lol-uikit-flyout-frame [class*="caret"]::after,
     .${PANEL_CLASS} .flyout::part(caret),
     .${PANEL_CLASS} lol-uikit-flyout-frame::part(caret),
     .${PANEL_CLASS} lol-uikit-flyout-frame::before,
@@ -818,6 +826,7 @@
       flyoutFrame.className = "flyout";
       flyoutFrame.setAttribute("orientation", "top");
       flyoutFrame.setAttribute("animated", "false");
+      flyoutFrame.setAttribute("caretless", "true");
       flyoutFrame.setAttribute("show", "true");
     } catch (e) {
       flyoutFrame = document.createElement("div");
