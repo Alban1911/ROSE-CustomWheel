@@ -1580,7 +1580,8 @@
   }
 
   function attachToChampionSelect() {
-    if (!championSelectRoot || !championLocked) {
+    // Attach as soon as champ select UI exists (even before a champion is locked)
+    if (!championSelectRoot) {
       return;
     }
 
@@ -1591,7 +1592,7 @@
     if (!targetContainer) {
       // Retry after a short delay if container not found (DOM might not be ready)
       setTimeout(() => {
-        if (championLocked && championSelectRoot) {
+        if (championSelectRoot) {
           const retryContainer = findButtonContainer();
           if (retryContainer) {
             attachToChampionSelect();
@@ -1661,7 +1662,9 @@
   }
 
   function refreshUIVisibility() {
-    if (championLocked && championSelectRoot) {
+    // Show the button whenever we're in champ select; only the Skins tab content
+    // is gated by champion lock/skin hover state.
+    if (championSelectRoot) {
       attachToChampionSelect();
       return;
     }
@@ -1673,7 +1676,7 @@
     const target = document.querySelector(".champion-select");
     if (target === championSelectRoot) {
       // Even if target is the same, check if button needs to be attached
-      if (championLocked && target && (!button || !button.parentNode)) {
+      if (target && (!button || !button.parentNode)) {
         refreshUIVisibility();
       }
       return;
@@ -1701,9 +1704,6 @@
   }
 
   function openPanel() {
-    if (!championLocked) {
-      return;
-    }
     if (!championSelectRoot) {
       return;
     }
@@ -1862,6 +1862,16 @@
     const championId = Number(state.championId);
     const skinId = Number(state.skinId);
 
+    // Skins are only meaningful once a champion is locked in champ select.
+    if (!championLocked) {
+      updateButtonBadge(0);
+      if (panel && panel._modsLoading) {
+        panel._modsLoading.textContent = "Waiting for champ lock…";
+        panel._modsLoading.style.display = "block";
+      }
+      return;
+    }
+
     // Only reset selection if skin actually changed
     if (selectedModId && selectedModSkinId !== skinId) {
       // Skin changed, reset selection
@@ -1874,7 +1884,7 @@
       // Reset badge when no skin is hovered
       updateButtonBadge(0);
       if (panel && panel._modsLoading) {
-        panel._modsLoading.textContent = "Hover a skin...";
+        panel._modsLoading.textContent = "Hover a skin…";
         panel._modsLoading.style.display = "block";
       }
       return;
@@ -2335,7 +2345,7 @@
     const repositionButton = () => {
       // Button is now part of container flow, so no manual repositioning needed
       // Just check if button needs to be reattached
-      if (button && !button.parentNode && championLocked) {
+      if (button && !button.parentNode && championSelectRoot) {
         attachToChampionSelect();
       }
       // Reposition panel if it's open
@@ -2350,7 +2360,7 @@
     // Periodic check to ensure button is attached on first champion select
     // This handles cases where events fire before DOM is ready
     let attachmentCheckInterval = setInterval(() => {
-      if (championLocked && championSelectRoot) {
+      if (championSelectRoot) {
         if (!button || !button.parentNode) {
           refreshUIVisibility();
         } else {
