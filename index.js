@@ -2153,10 +2153,6 @@
     // Update button badge with mod count
     updateButtonBadge(mods.length);
 
-    if (!isOpen) {
-      return;
-    }
-
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
     if (historicMod && !selectedModId) {
@@ -2173,6 +2169,13 @@
         selectedModId = modId;
         selectedModSkinId = skinId;
       }
+    }
+
+    // Keep Summary accurate even if the panel hasn't been opened yet
+    refreshSummaryValues();
+
+    if (!isOpen) {
+      return;
     }
 
     updateModEntries(mods);
@@ -2198,10 +2201,6 @@
   }
 
   function handleMapsResponse(event) {
-    if (!isOpen || activeTab !== "maps") {
-      return;
-    }
-
     const detail = event?.detail;
     if (!detail || detail.type !== "maps-response") {
       return;
@@ -2228,7 +2227,11 @@
       }
     }
 
-    updateMapsEntries(mapsList);
+    refreshSummaryValues();
+
+    if (isOpen && rightPaneMode === "picker" && activeTab === "maps") {
+      updateMapsEntries(mapsList);
+    }
 
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedMapId) {
@@ -2251,10 +2254,6 @@
   }
 
   function handleFontsResponse(event) {
-    if (!isOpen || activeTab !== "fonts") {
-      return;
-    }
-
     const detail = event?.detail;
     if (!detail || detail.type !== "fonts-response") {
       return;
@@ -2278,7 +2277,11 @@
       }
     }
 
-    updateFontsEntries(fontsList);
+    refreshSummaryValues();
+
+    if (isOpen && rightPaneMode === "picker" && activeTab === "fonts") {
+      updateFontsEntries(fontsList);
+    }
 
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedFontId) {
@@ -2301,10 +2304,6 @@
   }
 
   function handleAnnouncersResponse(event) {
-    if (!isOpen || activeTab !== "announcers") {
-      return;
-    }
-
     const detail = event?.detail;
     if (!detail || detail.type !== "announcers-response") {
       return;
@@ -2328,7 +2327,11 @@
       }
     }
 
-    updateAnnouncersEntries(announcersList);
+    refreshSummaryValues();
+
+    if (isOpen && rightPaneMode === "picker" && activeTab === "announcers") {
+      updateAnnouncersEntries(announcersList);
+    }
 
     // After UI is updated, emit selection to backend if historic mod was found
     if (historicMod && selectedAnnouncerId) {
@@ -2359,10 +2362,6 @@
     const othersList = Array.isArray(detail.others) ? detail.others : [];
     lastOthersResponse = othersList;
 
-    if (!isOpen) {
-      return;
-    }
-
     // Check for historic mod(s) and auto-select them
     // historicMod can be a string (legacy) or an array (new format)
     const historicMod = detail.historicMod;
@@ -2389,6 +2388,12 @@
           selectedOtherIds.push(otherId);
         }
       }
+    }
+
+    refreshSummaryValues();
+
+    if (!isOpen || rightPaneMode !== "picker" || !OTHER_CATEGORY_TABS.some((t) => t.id === activeTab)) {
+      return;
     }
 
     updateOthersEntries(othersList);
@@ -2496,6 +2501,13 @@
     window.addEventListener(EVENT_LOCK_STATE, handleChampionLocked, {
       passive: true,
     });
+
+    // Populate Summary selection state early (so first open shows persisted selections)
+    // These requests will return historicMod fields, which we now apply even when closed.
+    requestMaps();
+    requestFonts();
+    requestAnnouncers();
+    requestOthers();
     // Reposition button when skin changes
     const repositionButton = () => {
       // Button is now part of container flow, so no manual repositioning needed
