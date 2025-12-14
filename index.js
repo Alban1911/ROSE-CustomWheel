@@ -33,7 +33,8 @@
   let selectedOtherIds = []; // Array to support multiple selections
   let lastChampionSelectSession = null; // Track current champ select session
   let isFirstOpenInSession = true; // Track if this is first open in current session
-  let lastOthersResponse = []; // Cache of last "others" payload so category tabs can re-render without refetch
+  let lastCategoryModsById = {}; // Cache per category id (ui/voiceover/loading_screen/vfx/sfx/others)
+  let emittedHistoricOtherIds = new Set(); // Avoid re-emitting historic selections across categories
   let rightPaneMode = "summary"; // "summary" | "picker"
 
   const OTHER_CATEGORY_TABS = [
@@ -879,7 +880,11 @@
       } else if (tabName === "announcers") {
         requestAnnouncers();
       } else if (isOtherCategoryTab(tabName)) {
-        requestOthers();
+        if (lastCategoryModsById[tabName]) {
+          updateOtherCategoryEntries(tabName, lastCategoryModsById[tabName]);
+        } else {
+          requestCategoryMods(tabName);
+        }
       }
 
       // Update header title for picker context
@@ -1572,102 +1577,67 @@
     });
   }
 
-  function updateOthersEntries(othersList) {
+  function updateOtherCategoryEntries(categoryId, items) {
     if (!panel) {
       return;
     }
+    const listEl = panel[`_${categoryId}List`];
+    const loadingEl = panel[`_${categoryId}Loading`];
+    if (!listEl || !loadingEl) {
+      return;
+    }
 
-    const normalizePath = (value) =>
-      String(value || "")
-        .replace(/\\/g, "/")
-        .trim()
-        .toLowerCase();
+    listEl.innerHTML = "";
 
-    const getOtherPath = (other) =>
-      normalizePath(other?.id || other?.relativePath || other?.name || other?.modName);
+    if (!items || items.length === 0) {
+      const label = OTHER_CATEGORY_TABS.find((t) => t.id === categoryId)?.label || "mods";
+      loadingEl.textContent = `No ${label.toLowerCase()} found`;
+      loadingEl.style.display = "block";
+      return;
+    }
 
-    const categorizeOther = (other) => {
-      const p = getOtherPath(other);
-      const match = OTHER_CATEGORY_TABS.find((t) =>
-        (t.prefixes || []).some((prefix) => p.startsWith(prefix))
-      );
-      return match ? match.id : "others";
-    };
+    loadingEl.style.display = "none";
 
-    const createBuckets = () =>
-      OTHER_CATEGORY_TABS.reduce((acc, t) => {
-        acc[t.id] = [];
-        return acc;
-      }, {});
+    items.forEach((other) => {
+      const listItem = document.createElement("li");
+      const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
 
-    const buckets = createBuckets();
-    (othersList || []).forEach((other) => {
-      const bucketId = categorizeOther(other);
-      if (!buckets[bucketId]) buckets[bucketId] = [];
-      buckets[bucketId].push(other);
-    });
+      const otherNameRow = document.createElement("div");
+      otherNameRow.className = "mod-name-row";
 
-    const renderCategory = (categoryId, items) => {
-      const listEl = panel[`_${categoryId}List`];
-      const loadingEl = panel[`_${categoryId}Loading`];
-      if (!listEl || !loadingEl) {
-        return;
+      const otherName = document.createElement("div");
+      otherName.className = "mod-name";
+      otherName.textContent = other.name || other.modName || "Unnamed mod";
+      otherNameRow.appendChild(otherName);
+
+      const selectButton = document.createElement("button");
+      selectButton.className = "mod-select-button";
+      listItem.setAttribute("data-other-id", otherId);
+
+      if (selectedOtherIds.includes(otherId)) {
+        selectButton.textContent = "Selected";
+        selectButton.classList.add("selected");
+      } else {
+        selectButton.textContent = "Select";
       }
 
-      listEl.innerHTML = "";
-
-      if (!items || items.length === 0) {
-        const label = OTHER_CATEGORY_TABS.find((t) => t.id === categoryId)?.label || "mods";
-        loadingEl.textContent = `No ${label.toLowerCase()} found`;
-        loadingEl.style.display = "block";
-        return;
-      }
-
-      loadingEl.style.display = "none";
-
-      items.forEach((other) => {
-        const listItem = document.createElement("li");
-        const otherId = other.id || other.name || `other-${Date.now()}-${Math.random()}`;
-
-        const otherNameRow = document.createElement("div");
-        otherNameRow.className = "mod-name-row";
-
-        const otherName = document.createElement("div");
-        otherName.className = "mod-name";
-        otherName.textContent = other.name || other.modName || "Unnamed mod";
-        otherNameRow.appendChild(otherName);
-
-        const selectButton = document.createElement("button");
-        selectButton.className = "mod-select-button";
-        listItem.setAttribute("data-other-id", otherId);
-
-        if (selectedOtherIds.includes(otherId)) {
-          selectButton.textContent = "Selected";
-          selectButton.classList.add("selected");
-        } else {
-          selectButton.textContent = "Select";
-        }
-
-        selectButton.addEventListener("click", (e) => {
-          e.stopPropagation();
-          handleOtherSelect(otherId, selectButton, other);
-        });
-
-        otherNameRow.appendChild(selectButton);
-        listItem.appendChild(otherNameRow);
-
-        if (other.description) {
-          const otherDesc = document.createElement("div");
-          otherDesc.className = "mod-description";
-          otherDesc.textContent = other.description;
-          listItem.appendChild(otherDesc);
-        }
-
-        listEl.appendChild(listItem);
+      selectButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleOtherSelect(otherId, selectButton, other);
       });
-    };
 
-    OTHER_CATEGORY_TABS.forEach((t) => renderCategory(t.id, buckets[t.id] || []));
+      otherNameRow.appendChild(selectButton);
+      listItem.appendChild(otherNameRow);
+
+      if (other.description) {
+        const otherDesc = document.createElement("div");
+        otherDesc.className = "mod-description";
+        otherDesc.textContent = other.description;
+        listItem.appendChild(otherDesc);
+      }
+
+      listEl.appendChild(listItem);
+    });
   }
 
   function handleMapSelect(mapId, buttonElement, mapData) {
@@ -1943,7 +1913,11 @@
     } else if (activeTab === "announcers") {
       requestAnnouncers();
     } else if (OTHER_CATEGORY_TABS.some((t) => t.id === activeTab)) {
-      requestOthers();
+      if (lastCategoryModsById[activeTab]) {
+        updateOtherCategoryEntries(activeTab, lastCategoryModsById[activeTab]);
+      } else {
+        requestCategoryMods(activeTab);
+      }
     }
 
     // Initial positioning (will be repositioned after width is calculated)
@@ -1969,7 +1943,9 @@
     requestMaps();
     requestFonts();
     requestAnnouncers();
-    requestOthers();
+    for (const t of OTHER_CATEGORY_TABS) {
+      requestCategoryMods(t.id);
+    }
 
     // Add click outside handler
     const closeHandler = (e) => {
@@ -2090,18 +2066,24 @@
     }
   }
 
-  // Request others - global (not skin-specific)
-  // Backend should look in: %LOCALAPPDATA%\Rose\mods\others
-  function requestOthers() {
-    emit({ type: "request-others" });
+  // Request category mods - global (not skin-specific)
+  // Backend should look in: %LOCALAPPDATA%\Rose\mods\<category>
+  function requestCategoryMods(categoryId) {
+    if (!categoryId) return;
+    emit({ type: "request-category-mods", category: categoryId });
     if (!panel) return;
 
-    const loadingEl = panel[`_${activeTab}Loading`] || panel._othersLoading;
+    const loadingEl = panel[`_${categoryId}Loading`] || panel._othersLoading;
     if (loadingEl) {
-      const label = OTHER_CATEGORY_TABS.find((t) => t.id === activeTab)?.label || "others";
+      const label = OTHER_CATEGORY_TABS.find((t) => t.id === categoryId)?.label || "mods";
       loadingEl.textContent = `Loading ${label.toLowerCase()}…`;
       loadingEl.style.display = "block";
     }
+  }
+
+  // Legacy alias (kept for compatibility)
+  function requestOthers() {
+    requestCategoryMods(activeTab || "others");
   }
 
   function handleSkinState(event) {
@@ -2369,7 +2351,7 @@
     }
 
     const othersList = Array.isArray(detail.others) ? detail.others : [];
-    lastOthersResponse = othersList;
+    lastCategoryModsById["others"] = othersList;
 
     // Check for historic mod(s) and auto-select them
     // historicMod can be a string (legacy) or an array (new format)
@@ -2405,7 +2387,7 @@
       return;
     }
 
-    updateOthersEntries(othersList);
+    updateOtherCategoryEntries("others", othersList);
 
     // After UI is updated, emit selection to backend for all historic mods found
     if (historicMods.length > 0 && selectedOtherIds.length > 0) {
@@ -2428,6 +2410,62 @@
             button.classList.add("selected");
           }
           emit({ type: "select-other", otherId, otherData: historicOther, action: "select" });
+        }
+      }
+    }
+  }
+
+  function handleCategoryModsResponse(event) {
+    const detail = event?.detail;
+    if (!detail || detail.type !== "category-mods-response") {
+      return;
+    }
+
+    const category = String(detail.category || "").trim();
+    if (!OTHER_CATEGORY_TABS.some((t) => t.id === category)) {
+      return;
+    }
+
+    const modsList = Array.isArray(detail.mods) ? detail.mods : [];
+    lastCategoryModsById[category] = modsList;
+
+    // Apply historic selections across categories (paths include category prefixes, e.g. "ui/...")
+    const historicMod = detail.historicMod;
+    const historicMods = Array.isArray(historicMod) ? historicMod : (historicMod ? [historicMod] : []);
+    if (historicMods.length > 0) {
+      for (const historicPath of historicMods) {
+        const match = modsList.find((m) => {
+          const id = (m?.id || "").replace(/\\/g, "/");
+          return id === String(historicPath).replace(/\\/g, "/");
+        });
+        if (!match) continue;
+        const otherId = match.id || match.name || `other-${Date.now()}-${Math.random()}`;
+        if (!selectedOtherIds.includes(otherId)) {
+          selectedOtherIds.push(otherId);
+        }
+        if (!emittedHistoricOtherIds.has(otherId)) {
+          emittedHistoricOtherIds.add(otherId);
+          emit({ type: "select-other", otherId, otherData: match, action: "select" });
+        }
+      }
+    }
+
+    refreshSummaryValues();
+
+    if (!isOpen || rightPaneMode !== "picker" || activeTab !== category) {
+      return;
+    }
+
+    updateOtherCategoryEntries(category, modsList);
+
+    // Update visible button states for already-selected items
+    const listEl = panel?.[`_${category}List`];
+    if (listEl) {
+      for (const otherId of selectedOtherIds) {
+        const btn = listEl.querySelector(`[data-other-id="${otherId}"] .mod-select-button`);
+        if (btn) {
+          btn.textContent = "Selected";
+          btn.classList.add("selected");
         }
       }
     }
@@ -2504,6 +2542,9 @@
     window.addEventListener("rose-custom-wheel-announcers", handleAnnouncersResponse, {
       passive: true,
     });
+    window.addEventListener("rose-custom-wheel-category-mods", handleCategoryModsResponse, {
+      passive: true,
+    });
     window.addEventListener("rose-custom-wheel-others", handleOthersResponse, {
       passive: true,
     });
@@ -2516,7 +2557,9 @@
     requestMaps();
     requestFonts();
     requestAnnouncers();
-    requestOthers();
+    for (const t of OTHER_CATEGORY_TABS) {
+      requestCategoryMods(t.id);
+    }
     // Reposition button when skin changes
     const repositionButton = () => {
       // Button is now part of container flow, so no manual repositioning needed
