@@ -30,11 +30,13 @@
   let selectedMapId = null;
   let selectedFontId = null;
   let selectedAnnouncerId = null;
-  let selectedOtherIds = []; // Array to support multiple selections
+  // Per-category multi-selection (UI / Voiceover / Loading Screen / VFX / SFX / Others).
+  // These are first-class categories in the UI; they just share the same list rendering logic.
+  let selectedCategoryIds = Object.create(null);
   let lastChampionSelectSession = null; // Track current champ select session
   let isFirstOpenInSession = true; // Track if this is first open in current session
   let lastCategoryModsById = {}; // Cache per category id (ui/voiceover/loading_screen/vfx/sfx/others)
-  let emittedHistoricOtherIds = new Set(); // Avoid re-emitting historic selections across categories
+  let emittedHistoricSelectionKeys = new Set(); // Avoid re-emitting historic selections across category responses
   let rightPaneMode = "summary"; // "summary" | "picker"
 
   const OTHER_CATEGORY_TABS = [
@@ -58,6 +60,21 @@
     return String(value || "").replace(/\\/g, "/").trim().toLowerCase();
   }
 
+  function getSelectedIdsForCategory(categoryId) {
+    const key = String(categoryId || "").trim();
+    if (!key) return [];
+    if (!Array.isArray(selectedCategoryIds[key])) {
+      selectedCategoryIds[key] = [];
+    }
+    return selectedCategoryIds[key];
+  }
+
+  function clearAllCategorySelections() {
+    for (const t of OTHER_CATEGORY_TABS) {
+      selectedCategoryIds[t.id] = [];
+    }
+  }
+
   function getSelectedSummaryForTab(tabId) {
     if (tabId === "skins") {
       if (!championLocked) return "Waiting for champ lock…";
@@ -67,23 +84,9 @@
     if (tabId === "fonts") return selectedFontId ? String(selectedFontId) : "None";
     if (tabId === "announcers") return selectedAnnouncerId ? String(selectedAnnouncerId) : "None";
 
-    const cat = OTHER_CATEGORY_TABS.find((t) => t.id === tabId);
-    const all = Array.isArray(selectedOtherIds) ? selectedOtherIds : [];
-    if (!cat || all.length === 0) return "None";
-
-    const otherCats = OTHER_CATEGORY_TABS.filter((t) => t.id !== "others");
-    const matchesPrefix = (id, prefixes) =>
-      (prefixes || []).some((p) => normalizePathLike(id).startsWith(p));
-
-    if (tabId === "others") {
-      const othersOnly = all.filter(
-        (id) => !otherCats.some((t) => matchesPrefix(id, t.prefixes))
-      );
-      return othersOnly.length ? othersOnly.join(", ") : "None";
-    }
-
-    const filtered = all.filter((id) => matchesPrefix(id, cat.prefixes));
-    return filtered.length ? filtered.join(", ") : "None";
+    // UI / Voiceover / Loading Screen / VFX / SFX / Others are their own categories.
+    const selected = getSelectedIdsForCategory(tabId);
+    return selected.length ? selected.join(", ") : "None";
   }
 
   function getTabLabel(tabId) {
@@ -98,6 +101,8 @@
         el.textContent = getSelectedSummaryForTab(tab.id);
       }
     }
+    // Keep the button badge in sync even when the panel is closed.
+    refreshButtonBadgeFromSelections();
   }
 
   function setRightPaneMode(mode) {
@@ -1298,6 +1303,7 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
   }
 
   function updateModEntries(mods) {
@@ -1588,6 +1594,7 @@
     }
 
     listEl.innerHTML = "";
+    const selectedIds = getSelectedIdsForCategory(categoryId);
 
     if (!items || items.length === 0) {
       const label = OTHER_CATEGORY_TABS.find((t) => t.id === categoryId)?.label || "mods";
@@ -1614,7 +1621,7 @@
       selectButton.className = "mod-select-button";
       listItem.setAttribute("data-other-id", otherId);
 
-      if (selectedOtherIds.includes(otherId)) {
+      if (selectedIds.includes(otherId)) {
         selectButton.textContent = "Selected";
         selectButton.classList.add("selected");
       } else {
@@ -1623,7 +1630,7 @@
 
       selectButton.addEventListener("click", (e) => {
         e.stopPropagation();
-        handleOtherSelect(otherId, selectButton, other);
+        handleCategoryModSelect(categoryId, otherId, selectButton, other);
       });
 
       otherNameRow.appendChild(selectButton);
@@ -1663,6 +1670,7 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
   }
 
   function handleFontSelect(fontId, buttonElement, fontData) {
@@ -1688,6 +1696,7 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
   }
 
   function handleAnnouncerSelect(announcerId, buttonElement, announcerData) {
@@ -1713,25 +1722,28 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
   }
 
-  function handleOtherSelect(otherId, buttonElement, otherData) {
-    const index = selectedOtherIds.indexOf(otherId);
+  function handleCategoryModSelect(categoryId, otherId, buttonElement, otherData) {
+    const selectedIds = getSelectedIdsForCategory(categoryId);
+    const index = selectedIds.indexOf(otherId);
     if (index !== -1) {
       // Deselect
-      selectedOtherIds.splice(index, 1);
+      selectedIds.splice(index, 1);
       buttonElement.textContent = "Select";
       buttonElement.classList.remove("selected");
-      emit({ type: "select-other", otherId, otherData, action: "deselect" });
+      emit({ type: "select-other", category: categoryId, otherId, otherData, action: "deselect" });
     } else {
       // Select (add to array)
-      selectedOtherIds.push(otherId);
+      selectedIds.push(otherId);
       buttonElement.textContent = "Selected";
       buttonElement.classList.add("selected");
-      emit({ type: "select-other", otherId, otherData, action: "select" });
+      emit({ type: "select-other", category: categoryId, otherId, otherData, action: "select" });
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
   }
 
   function findButtonContainer() {
@@ -1995,7 +2007,7 @@
 
     // Skins are only meaningful once a champion is locked in champ select.
     if (!championLocked) {
-      updateButtonBadge(0);
+      // Badge reflects selected mods across categories; don't zero it here.
       if (panel && panel._modsLoading) {
         panel._modsLoading.textContent = "Waiting for champ lock…";
         panel._modsLoading.style.display = "block";
@@ -2012,20 +2024,12 @@
     // If same skin, keep the selection
 
     if (!championId || !skinId) {
-      // Reset badge when no skin is hovered
-      updateButtonBadge(0);
+      // Badge reflects selected mods across categories; don't zero it here.
       if (panel && panel._modsLoading) {
         panel._modsLoading.textContent = "Hover a skin…";
         panel._modsLoading.style.display = "block";
       }
       return;
-    }
-
-    // Reset badge immediately when requesting mods for a new skin
-    // This ensures the badge doesn't show stale data while waiting for response
-    const previousSkinId = currentSkinData?.skinId;
-    if (previousSkinId !== undefined && previousSkinId !== skinId) {
-      updateButtonBadge(0);
     }
 
     emit({ type: REQUEST_TYPE, championId, skinId });
@@ -2116,6 +2120,29 @@
     }
   }
 
+  // Badge should reflect how many mods are currently selected (across all categories),
+  // not how many mods are available for the hovered skin.
+  function getSelectedModsCount() {
+    let count = 0;
+    // Skins are only meaningful after champ lock.
+    if (championLocked && selectedModId) count += 1;
+    if (selectedMapId) count += 1;
+    if (selectedFontId) count += 1;
+    if (selectedAnnouncerId) count += 1;
+    // Sum the unique selections per category (UI / VO / Loading Screen / VFX / SFX / Others).
+    for (const t of OTHER_CATEGORY_TABS) {
+      const ids = getSelectedIdsForCategory(t.id);
+      if (Array.isArray(ids) && ids.length) {
+        count += new Set(ids).size;
+      }
+    }
+    return count;
+  }
+
+  function refreshButtonBadgeFromSelections() {
+    updateButtonBadge(getSelectedModsCount());
+  }
+
   function handleModsResponse(event) {
     const detail = event?.detail;
     if (!detail || detail.type !== "skin-mods-response") {
@@ -2125,7 +2152,8 @@
     const championId = Number(detail?.championId);
     const skinId = Number(detail?.skinId);
     if (!championId || !skinId) {
-      updateButtonBadge(0);
+      // Badge reflects selected mods across categories; don't zero it due to missing hover state.
+      refreshButtonBadgeFromSelections();
       return;
     }
 
@@ -2140,9 +2168,6 @@
     }
 
     const mods = Array.isArray(detail.mods) ? detail.mods : [];
-
-    // Update button badge with mod count
-    updateButtonBadge(mods.length);
 
     // Check for historic mod and auto-select it
     const historicMod = detail.historicMod;
@@ -2164,6 +2189,7 @@
 
     // Keep Summary accurate even if the panel hasn't been opened yet
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     if (!isOpen) {
       return;
@@ -2219,6 +2245,7 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     if (isOpen && rightPaneMode === "picker" && activeTab === "maps") {
       updateMapsEntries(mapsList);
@@ -2269,6 +2296,7 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     if (isOpen && rightPaneMode === "picker" && activeTab === "fonts") {
       updateFontsEntries(fontsList);
@@ -2319,6 +2347,7 @@
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     if (isOpen && rightPaneMode === "picker" && activeTab === "announcers") {
       updateAnnouncersEntries(announcersList);
@@ -2358,7 +2387,8 @@
     const historicMod = detail.historicMod;
     const historicMods = Array.isArray(historicMod) ? historicMod : (historicMod ? [historicMod] : []);
     
-    if (historicMods.length > 0 && selectedOtherIds.length === 0) {
+    const selectedIds = getSelectedIdsForCategory("others");
+    if (historicMods.length > 0 && selectedIds.length === 0) {
       // Find all mods that match the historic paths
       const historicOthers = [];
       for (const historicPath of historicMods) {
@@ -2375,13 +2405,14 @@
       // Add all historic mods to selected list
       for (const historicOther of historicOthers) {
         const otherId = historicOther.id || historicOther.name || `other-${Date.now()}-${Math.random()}`;
-        if (!selectedOtherIds.includes(otherId)) {
-          selectedOtherIds.push(otherId);
+        if (!selectedIds.includes(otherId)) {
+          selectedIds.push(otherId);
         }
       }
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     if (!isOpen || rightPaneMode !== "picker" || !OTHER_CATEGORY_TABS.some((t) => t.id === activeTab)) {
       return;
@@ -2390,7 +2421,7 @@
     updateOtherCategoryEntries("others", othersList);
 
     // After UI is updated, emit selection to backend for all historic mods found
-    if (historicMods.length > 0 && selectedOtherIds.length > 0) {
+    if (historicMods.length > 0 && selectedIds.length > 0) {
       for (const historicPath of historicMods) {
         const historicOther = othersList.find(other => {
           const otherId = other.id || "";
@@ -2409,7 +2440,7 @@
             button.textContent = "Selected";
             button.classList.add("selected");
           }
-          emit({ type: "select-other", otherId, otherData: historicOther, action: "select" });
+          emit({ type: "select-other", category: "others", otherId, otherData: historicOther, action: "select" });
         }
       }
     }
@@ -2429,7 +2460,7 @@
     const modsList = Array.isArray(detail.mods) ? detail.mods : [];
     lastCategoryModsById[category] = modsList;
 
-    // Apply historic selections across categories (paths include category prefixes, e.g. "ui/...")
+    // Apply historic selections for this specific category.
     const historicMod = detail.historicMod;
     const historicMods = Array.isArray(historicMod) ? historicMod : (historicMod ? [historicMod] : []);
     if (historicMods.length > 0) {
@@ -2440,17 +2471,20 @@
         });
         if (!match) continue;
         const otherId = match.id || match.name || `other-${Date.now()}-${Math.random()}`;
-        if (!selectedOtherIds.includes(otherId)) {
-          selectedOtherIds.push(otherId);
+        const selectedIds = getSelectedIdsForCategory(category);
+        if (!selectedIds.includes(otherId)) {
+          selectedIds.push(otherId);
         }
-        if (!emittedHistoricOtherIds.has(otherId)) {
-          emittedHistoricOtherIds.add(otherId);
-          emit({ type: "select-other", otherId, otherData: match, action: "select" });
+        const key = `${category}:${otherId}`;
+        if (!emittedHistoricSelectionKeys.has(key)) {
+          emittedHistoricSelectionKeys.add(key);
+          emit({ type: "select-other", category, otherId, otherData: match, action: "select" });
         }
       }
     }
 
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     if (!isOpen || rightPaneMode !== "picker" || activeTab !== category) {
       return;
@@ -2461,7 +2495,7 @@
     // Update visible button states for already-selected items
     const listEl = panel?.[`_${category}List`];
     if (listEl) {
-      for (const otherId of selectedOtherIds) {
+      for (const otherId of getSelectedIdsForCategory(category)) {
         const btn = listEl.querySelector(`[data-other-id="${otherId}"] .mod-select-button`);
         if (btn) {
           btn.textContent = "Selected";
@@ -2481,14 +2515,11 @@
       return;
     }
 
-    // If a new champion is being locked, clear all selections and reset session
+    // If a new champion is being locked, only clear SKIN-specific selections.
+    // Global selections (maps/fonts/announcers/UI/VO/VFX/...) should persist across champ locks.
     if (locked && !championLocked) {
       selectedModId = null;
       selectedModSkinId = null;
-      selectedMapId = null;
-      selectedFontId = null;
-      selectedAnnouncerId = null;
-      selectedOtherIds = [];
       // New champ select session - reset to first open
       lastChampionSelectSession = championSelectRoot;
       isFirstOpenInSession = true;
@@ -2497,6 +2528,7 @@
     championLocked = locked;
     refreshUIVisibility();
     refreshSummaryValues();
+    refreshButtonBadgeFromSelections();
 
     // Additional retry after lock state changes to ensure button appears
     if (locked) {
