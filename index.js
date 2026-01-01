@@ -135,6 +135,62 @@
   let bridgeReady = false;
   let bridgeQueue = [];
 
+  // Some environments attach `window.__roseBridgeEmit` late (often after UI loads).
+  // If we emit too early and give up, historic selections won't be applied until the panel is opened.
+  // Queue payloads until the emitter becomes available.
+  const pendingEmitQueue = [];
+  let emitFlushInterval = null;
+  let emitFlushStopTimer = null;
+
+  function tryFlushPendingEmits() {
+    const emitter = window?.__roseBridgeEmit;
+    if (typeof emitter !== "function") return false;
+    emitRetryCount = 0;
+    if (pendingEmitQueue.length) {
+      try {
+        console.log(`${LOG_PREFIX} Bridge emitter ready; flushing ${pendingEmitQueue.length} queued message(s)`);
+      } catch {
+        // ignore
+      }
+    }
+    while (pendingEmitQueue.length) {
+      const next = pendingEmitQueue.shift();
+      try {
+        emitter(next);
+      } catch (e) {
+        // If emitting fails, re-queue and stop flushing for now.
+        pendingEmitQueue.unshift(next);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function schedulePendingEmitFlush() {
+    if (emitFlushInterval) return;
+
+    // Poll quickly; once the emitter exists we flush everything and stop.
+    emitFlushInterval = setInterval(() => {
+      if (tryFlushPendingEmits()) {
+        clearInterval(emitFlushInterval);
+        emitFlushInterval = null;
+        if (emitFlushStopTimer) {
+          clearTimeout(emitFlushStopTimer);
+          emitFlushStopTimer = null;
+        }
+      }
+    }, 200);
+
+    // Safety stop: if emitter never appears, don't poll forever.
+    emitFlushStopTimer = setTimeout(() => {
+      if (emitFlushInterval) {
+        clearInterval(emitFlushInterval);
+        emitFlushInterval = null;
+      }
+      emitFlushStopTimer = null;
+    }, 5 * 60 * 1000);
+  }
+
   // Load bridge port with file-based discovery and localStorage caching
   async function loadBridgePort() {
     try {
@@ -331,13 +387,19 @@
   function emit(payload) {
     const emitter = window?.__roseBridgeEmit;
     if (typeof emitter !== "function") {
-      if (emitRetryCount < 60) {
-        emitRetryCount += 1;
-        setTimeout(() => emit(payload), 200);
+      // Queue and flush later when the emitter becomes available.
+      // Cap queue size to avoid unbounded growth if something is really wrong.
+      if (pendingEmitQueue.length >= 200) {
+        pendingEmitQueue.shift();
       }
+      pendingEmitQueue.push(payload);
+      emitRetryCount = Math.min(emitRetryCount + 1, 9999);
+      schedulePendingEmitFlush();
       return;
     }
     emitRetryCount = 0;
+    // Flush anything queued first to preserve ordering, then send the current payload.
+    tryFlushPendingEmits();
     emitter(payload);
   }
 
