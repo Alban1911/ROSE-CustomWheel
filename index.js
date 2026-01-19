@@ -435,6 +435,8 @@
     .rose-custom-wheel-button {
       display: inline-block !important;
       white-space: nowrap !important;
+      /* Keep badge stacking self-contained (prevents weird overlap with other UI) */
+      isolation: isolate !important;
     }
 
     .rose-custom-wheel-button .count-badge.social-count-badge,
@@ -442,8 +444,10 @@
     .rose-custom-wheel-button > .count-badge.social-count-badge,
     lol-uikit-flat-button.rose-custom-wheel-button > .count-badge.social-count-badge {
       position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
+      /* Positioning: edit these via CSS variables on the element (DevTools-friendly) */
+      top: var(--rose-badge-top, -4px) !important;
+      right: var(--rose-badge-right, -17px) !important;
+      left: var(--rose-badge-left, auto) !important;
       min-width: 18px !important;
       height: 18px !important;
       padding: 0 5px !important;
@@ -458,10 +462,13 @@
       line-height: 1 !important;
       box-sizing: border-box !important;
       pointer-events: none !important;
-      z-index: 10 !important;
-      transform: translate(-170%, -70%) !important;
+      /* Above button contents, but not globally "high" */
+      z-index: 1 !important;
+      transform: translate(
+        var(--rose-badge-translate-x, 60%),
+        var(--rose-badge-translate-y, -60%)
+      ) !important;
       margin: 0 !important;
-      right: auto !important;
       bottom: auto !important;
     }
 
@@ -848,10 +855,12 @@
     countBadge.className = "count-badge social-count-badge";
     countBadge.textContent = "0";
     countBadge.style.display = "none"; // Hidden by default
-    countBadge.style.position = "absolute";
-    countBadge.style.top = "0";
-    countBadge.style.left = "0";
-    countBadge.style.transform = "translate(-70%, -50%)";
+    // Defaults (can be overridden live in DevTools on the element via CSS variables)
+    countBadge.style.setProperty("--rose-badge-top", "-4px");
+    countBadge.style.setProperty("--rose-badge-right", "-17px");
+    countBadge.style.setProperty("--rose-badge-left", "auto");
+    countBadge.style.setProperty("--rose-badge-translate-x", "60%");
+    countBadge.style.setProperty("--rose-badge-translate-y", "-60%");
     button.appendChild(countBadge);
     button._countBadge = countBadge; // Store reference
 
